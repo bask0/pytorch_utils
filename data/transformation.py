@@ -5,7 +5,7 @@ from typing import List, Dict, Iterable, Tuple, Union, Any
 
 
 class Normalize(object):
-    def __init__(self, dtype: type = np.float32):
+    def __init__(self, dtype: type = np.float32) -> None:
         """Data normalization functionality for torch.Tensor and np.ndarrays.
 
         Usage:
