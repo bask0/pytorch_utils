@@ -342,7 +342,7 @@ class Normalize(object):
             >>> n = Normalize()
             >>> n.register_dict({'var_a': torch.arange(10)})
             >>> n.save('test.pkl')
-            >>> r_restored = Normalize.load('test.pkl')
+            >>> n_restored = Normalize.load('test.pkl')
 
         Args:
             pash (str):
