@@ -56,7 +56,8 @@ class Normalize(object):
         self.dtype = dtype
 
     def normalize(
-            self, key: str,
+            self,
+            key: str,
             x: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
         """Normalize `x`, stats for `key` must have been registered previously.
 
@@ -73,7 +74,8 @@ class Normalize(object):
         return self._transform(key, x, invert=False)
 
     def unnormalize(
-            self, key: str,
+            self,
+            key: str,
             x: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
         """Un-normalize `x`, stats for `key` must have been registered previously.
 
