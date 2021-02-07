@@ -215,7 +215,7 @@ class Normalize(object):
             self, key: str,
             x: Union[np.ndarray, torch.Tensor],
             invert: bool = False) -> Union[np.ndarray, torch.Tensor]:
-        """Transform data, either normalize of unnormalize (if `invert`)"""
+        """Transform data, either normalize or unnormalize (if `invert`)"""
         if key not in self._stats:
             raise KeyError(f'no stats found for key `{key}`.')
         self._assert_dtype('invert', invert, bool)
@@ -233,7 +233,7 @@ class Normalize(object):
             self,
             d: Dict[str, Union[np.ndarray, torch.Tensor]],
             invert: bool = False) -> Dict[str, Union[np.ndarray, torch.Tensor]]:
-        """Transform data, either normalize of unnormalize (if `invert`)"""
+        """Transform data, either normalize or unnormalize (if `invert`)"""
         self._assert_dtype('d', d, dict)
 
         r = {}
@@ -245,7 +245,7 @@ class Normalize(object):
     def _stack_dict(
             self,
             d: Dict[str, Union[np.ndarray, torch.Tensor]]) -> Union[np.ndarray, torch.Tensor]:
-        """Stack values in a dict."""
+        """Stack values in a dict along last dimension."""
         if self._contains_torch(d):
             return torch.stack(list(d.values()), dim=-1)
         else:
@@ -267,7 +267,7 @@ class Normalize(object):
                 The required type.
 
         Raises:
-            TypeError if wrong type.
+            TypeError: if wrong type.
         """
 
         dtype_as_str = dtype.__name__ if isinstance(dtype, type) else ' or '.join([t.__name__ for t in dtype])
@@ -287,7 +287,7 @@ class Normalize(object):
             TypeError if not iterable.
         """
         if not hasattr(keys, '__iter__') or isinstance(val, dtype):
-            raise TypeError(f'`{key}` must be of type `{dtype.__name__}` but is `{type(val)}`.')
+            raise TypeError(f'`{key}` must be an iterable but is `{type(val)}`.')
 
     def _contains_torch(self, d: Dict[str, Any]) -> bool:
         """Checks if a dict contains a torch.Tensor or a np.ndarray.
@@ -332,7 +332,7 @@ class Normalize(object):
         return self.__str__()
 
     def save(self, path: str) -> None:
-        """Save stats to file. Can be restored later using `.load(...)`.
+        """Save object to file. Can be restored later using `.load(...)`.
 
         Args:
             pash (str):
@@ -367,20 +367,10 @@ class Normalize(object):
         n._set_stats(d)
         return n
 
-    def __str__(self) -> str:
-        s = f'Normalize(dtype={self.dtype.__name__})\n{"-"* 40}\n'
-        if len(self.stats) == 0:
-            s += '  no stats registered.'
-        else:
-            for key, stats in self.stats.items():
-                s += ' * '
-                s += f'{key}: {stats["mean"]:0.3f} ({stats["std"]:0.3f} std)'
-                s += '\n'
-
-        return s
-
-    def __repr__(self) -> str:
-        return self.__str__()
+    @property
+    def stats(self):
+        """A dict containing means and standard deviations."""
+        return self._stats
 
     def _set_stats(self, d: Dict[str, Dict[str, float]]) -> None:
         """Assign stats dict. Internal use only, do not use.
@@ -398,7 +388,17 @@ class Normalize(object):
                 )
         self._stats = d
 
-    @property
-    def stats(self):
-        """A dict containing means and standard deviations."""
-        return self._stats
+    def __str__(self) -> str:
+        s = f'Normalize(dtype={self.dtype.__name__})\n{"-"* 40}\n'
+        if len(self.stats) == 0:
+            s += '  no stats registered.'
+        else:
+            for key, stats in self.stats.items():
+                s += ' * '
+                s += f'{key}: {stats["mean"]:0.3f} ({stats["std"]:0.3f} std)'
+                s += '\n'
+
+        return s
+
+    def __repr__(self) -> str:
+        return self.__str__()
