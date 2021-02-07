@@ -263,7 +263,7 @@ class Normalize(object):
 
         dtype_as_str = dtype.__name__ if isinstance(dtype, type) else ' or '.join([t.__name__ for t in dtype])
         if not isinstance(val, dtype):
-            raise TypeError(f'`{key}` must be of type `{dtype.__name__}` but is {type(val)}.')
+            raise TypeError(f'`{key}` must be of type `{dtype_as_str}` but is `{type(val)}`.')
 
     def _assert_iterable(self, key, val):
         """Check if val is an iterable (excluding str).
@@ -278,7 +278,7 @@ class Normalize(object):
             TypeError if not iterable.
         """
         if not hasattr(keys, '__iter__') or isinstance(val, dtype):
-            raise TypeError(f'`{key}` must be of type `{dtype.__name__}` but is {type(val)}.')
+            raise TypeError(f'`{key}` must be of type `{dtype.__name__}` but is `{type(val)}`.')
 
     def _contains_torch(self, d: Dict[str, Any]) -> bool:
         """Checks if a dict contains a torch.Tensor or a np.ndarray.
