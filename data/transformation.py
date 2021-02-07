@@ -316,21 +316,6 @@ class Normalize(object):
                 'np.ndarray, but type `{first_item.dtype}`.'
             )
 
-    def __str__(self):
-        s = f'Normalize(dtype={self.dtype.__name__})\n{"-"* 40}\n'
-        if len(self.stats) == 0:
-            s += '  no stats registered.'
-        else:
-            for key, stats in self.stats.items():
-                s += ' * '
-                s += f'{key}: {stats["mean"]:0.3f} ({stats["std"]:0.3f} std)'
-                s += '\n'
-
-        return s
-
-    def __repr__(self):
-        return self.__str__()
-
     def save(self, path: str) -> None:
         """Save object to file. Can be restored later using `.load(...)`.
 
