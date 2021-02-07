@@ -215,7 +215,7 @@ class Normalize(object):
             self, key: str,
             x: Union[np.ndarray, torch.Tensor],
             invert: bool = False) -> Union[np.ndarray, torch.Tensor]:
-        """Transform data, either standardize of unstandardize (if `invert`)"""
+        """Transform data, either normalize of unnormalize (if `invert`)"""
         if key not in self._stats:
             raise KeyError(f'no stats found for key `{key}`.')
         self._assert_dtype('invert', invert, bool)
@@ -233,7 +233,7 @@ class Normalize(object):
             self,
             d: Dict[str, Union[np.ndarray, torch.Tensor]],
             invert: bool = False) -> Dict[str, Union[np.ndarray, torch.Tensor]]:
-        """Transform data, either standardize of unstandardize (if `invert`)"""
+        """Transform data, either normalize of unnormalize (if `invert`)"""
         self._assert_dtype('d', d, dict)
 
         r = {}
