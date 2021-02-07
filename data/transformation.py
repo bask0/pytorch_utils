@@ -8,6 +8,13 @@ class Normalize(object):
     def __init__(self, dtype: type = np.float32):
         """Data normalization functionality for torch.Tensor and np.ndarrays.
 
+        Usage:
+            1. Create a new instance `Noramlize()`.
+            2. Register variables. This means, a variable name and data is passed and the
+               mean and standard deviation is recorded.
+            3. Pass variable (single or multiple ones) to (un-)normalize them using the
+               stats that were regitered before.
+
         Example:
             Register variables:
             
