@@ -322,6 +322,23 @@ class Normalize(object):
     def __repr__(self):
         return self.__str__()
 
+
+    def _set_stats(self, d: Dict[str, Dict[str, float]]) -> None:
+        """Assign stats dict. Internal use only, do not use.
+
+        Args:
+            d (dict):
+                A dict of variable means and standard deviations: {'var_a': {'mean': __, 'std': __}}.
+        """
+        self._assert_dtype('d', d, dict)
+        for key, val in d.items():
+            self._assert_dtype(f'd[`{key}`]', val, dict)
+            if not ('mean' in val and 'std' in val):
+                raise ValueError(
+                    f'tried to assign stats dict, but d[`{key}`] does not have keys `mean` and `std`.'
+                )
+        self._stats = d
+
     @property
     def stats(self):
         """A dict containing means and standard deviations."""
