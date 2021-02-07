@@ -49,11 +49,13 @@ class Normalize(object):
             10.12
 
             Normalize dict:
+
             >>> n.normalize_dict({'var_a': torch.arange(2), 'var_b': np.random.normal(loc=2, scale=10., size=2)})
             {'var_a': tensor([-1.5667, -1.2185]),
              'var_b': array([-1.35922953, -0.81025503])}
 
             Normalize dict and stack (note that we cannot mix np.ndarrays and torch.Tensors here):
+
             >>> n.normalize_dict({'var_a': np.arange(2), 'var_b': np.random.normal(loc=2, scale=10., size=2)}, return_stack=True)
             array([[-1.56669891,  0.0801657 ],
                    [-1.2185436 , -0.56352366]])
