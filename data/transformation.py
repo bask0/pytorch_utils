@@ -322,6 +322,56 @@ class Normalize(object):
     def __repr__(self):
         return self.__str__()
 
+    def save(self, path: str) -> None:
+        """Save stats to file. Can be restored later using `.load(...)`.
+
+        Args:
+            pash (str):
+                File path to save object to.
+        """
+        d_save = self.stats
+        d_save.update({'dtype': self.dtype})
+        with open(path, 'wb') as f:
+            pickle.dump(d_save, f)
+
+    @classmethod
+    def load(cls, path: str) -> Normalize:
+        """Load from file.
+
+        Example:
+            >>> n = Normalize()
+            >>> n.register_dict({'var_a': torch.arange(10)})
+            >>> n.save('test.pkl')
+            >>> r_restored = Normalize.load('test.pkl')
+
+        Args:
+            pash (str):
+                File path to save object to.
+
+        Returns:
+            Normalize: restored object.
+        """
+        with open(path, 'rb') as f:
+            d = pickle.load(f)
+        dtype = d.pop('dtype')
+        n = cls(dtype)
+        n._set_stats(d)
+        return n
+
+    def __str__(self) -> str:
+        s = f'Normalize(dtype={self.dtype.__name__})\n{"-"* 40}\n'
+        if len(self.stats) == 0:
+            s += '  no stats registered.'
+        else:
+            for key, stats in self.stats.items():
+                s += ' * '
+                s += f'{key}: {stats["mean"]:0.3f} ({stats["std"]:0.3f} std)'
+                s += '\n'
+
+        return s
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
     def _set_stats(self, d: Dict[str, Dict[str, float]]) -> None:
         """Assign stats dict. Internal use only, do not use.
