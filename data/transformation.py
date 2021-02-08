@@ -94,7 +94,7 @@ class Normalize(object):
             key (str):
                 The name of the variable to un-normlize.
             x (np.ndarray or torch.Tensor):
-                The data to normalize.
+                The data to un-normalize.
 
         Returns:
             np.ndarray or torch.Tensor: un-normalized data, same type as input.
@@ -137,7 +137,7 @@ class Normalize(object):
             return_stack: bool = False) -> Union[Dict[str, Union[np.ndarray, torch.Tensor]], np.ndarray, torch.Tensor]:
         """Un-normalize data in `d`, stats for keys must have been registered previously.
 
-        Normlization: x * std + mean
+        Un-normlization: x * std + mean
 
         Args:
             d (dict):
