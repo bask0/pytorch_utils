@@ -286,7 +286,7 @@ class Normalize(object):
         Raises:
             TypeError if not iterable.
         """
-        if not hasattr(keys, '__iter__') or isinstance(val, dtype):
+        if not hasattr(keys, '__iter__') or isinstance(val, str):
             raise TypeError(f'`{key}` must be an iterable but is `{type(val)}`.')
 
     def _contains_torch(self, d: Dict[str, Any]) -> bool:
