@@ -329,7 +329,7 @@ class Normalize(object):
             pickle.dump(d_save, f)
 
     @classmethod
-    def load(cls, path: str) -> Normalize:
+    def load(cls, path: str) -> 'Normalize':
         """Load from file.
 
         Example:
