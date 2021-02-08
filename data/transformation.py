@@ -339,7 +339,7 @@ class Normalize(object):
             >>> n_restored = Normalize.load('test.pkl')
 
         Args:
-            pash (str):
+            path (str):
                 File path to save object to.
 
         Returns:
