@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from typing import List, Dict, Iterable, Tuple, Union, Any
+from typing import List, Dict, Iterable, Tuple, Union, Any, Optional
 
 
 class Normalize(object):
@@ -104,6 +104,7 @@ class Normalize(object):
     def normalize_dict(
             self,
             d: Dict[str, Union[np.ndarray, torch.Tensor]],
+            variables: Optional[List[str]] = None,
             return_stack: bool = False) -> Union[Dict[str, Union[np.ndarray, torch.Tensor]], np.ndarray, torch.Tensor]:
         """Normalize data in `d`, stats for keys must have been registered previously.
 
@@ -112,6 +113,8 @@ class Normalize(object):
         Args:
             d (dict):
                 The name of the variable to normlize.
+            variables (List[str]):
+                Optional subset of variables to return. All variables must be present in `stats`.
             return_stack (bool):
                 Whether to return a stack of all values in `d`. If `False`, a dict with the normalized
                 data is returned. If `True`, the values are stacked along the last dimension. The values
@@ -124,6 +127,10 @@ class Normalize(object):
         self._assert_dtype('d', d, dict)
         self._assert_dtype('return_stack', return_stack, bool)
 
+        if variables is not None:
+            self._assert_dtype('variables', variables, list)
+            d = {v: d[v] for v in variables}
+
         d = self._transform_dict(d, invert=False)
 
         if return_stack:
@@ -134,6 +141,7 @@ class Normalize(object):
     def unnormalize_dict(
             self,
             d: Dict[str, Union[np.ndarray, torch.Tensor]],
+            variables: Optional[List[str]] = None,
             return_stack: bool = False) -> Union[Dict[str, Union[np.ndarray, torch.Tensor]], np.ndarray, torch.Tensor]:
         """Un-normalize data in `d`, stats for keys must have been registered previously.
 
@@ -142,6 +150,8 @@ class Normalize(object):
         Args:
             d (dict):
                 The name of the variable to un-normlize.
+            variables (List[str]):
+                Optional subset of variables to return. All variables must be present in `stats`.
             return_stack (bool):
                 Whether to return a stack of all values in `d`. If `False`, a dict with the un-normalized
                 data is returned. If `True`, the values are stacked along the last dimension. The values
@@ -153,6 +163,10 @@ class Normalize(object):
         """
         self._assert_dtype('d', d, dict)
         self._assert_dtype('return_stack', return_stack, bool)
+
+        if variables is not None:
+            self._assert_dtype('variables', variables, list)
+            d = {v: d[v] for v in variables}
 
         d = self._transform_dict(d, invert=True)
         if return_stack:
