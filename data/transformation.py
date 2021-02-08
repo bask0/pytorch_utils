@@ -289,12 +289,12 @@ class Normalize(object):
         if not hasattr(keys, '__iter__') or isinstance(val, str):
             raise TypeError(f'`{key}` must be an iterable but is `{type(val)}`.')
 
-    def _contains_torch(self, d: Dict[str, Any]) -> bool:
+    def _contains_torch(self, d: Dict[str, Union[torch.Tensor, np.ndarray, np.floating]]) -> bool:
         """Checks if a dict contains a torch.Tensor or a np.ndarray.
 
         Args:
         d (dict):
-            A dict containing either torch.Tensor or np.ndarray.
+            A dict containing either torch.Tensor, np.ndarray, or float.
 
         Returns:
             bool: `True` if dict contains torch.Tensor, `False` if np.ndarray.
@@ -308,12 +308,12 @@ class Normalize(object):
         first_item = d[first_key]
         if isinstance(first_item, torch.Tensor):
             return True
-        elif isinstance(first_item, np.ndarray):
+        elif isinstance(first_item, (np.ndarray, np.floating)):
             return False
         else:
             raise ValueError(
                 'dict contains values that are neither of type torch.Tensor nor '
-                'np.ndarray, but type `{first_item.dtype}`.'
+                f'np.ndarray, but type `{first_item.dtype}`.'
             )
 
     def save(self, path: str) -> None:
