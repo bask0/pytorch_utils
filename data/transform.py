@@ -60,6 +60,10 @@ class Normalize(object):
             array([[-1.56669891,  0.0801657 ],
                    [-1.2185436 , -0.56352366]])
 
+            Register stats manually:
+
+            n.register_manually('my_var', mean=1.0, std=2.5)
+
         """
         self._stats = {}
         self.dtype = dtype
@@ -188,6 +192,24 @@ class Normalize(object):
         self._assert_dtype('x', x, (np.ndarray, torch.Tensor))
 
         mean, std = self._get_mean_and_std(x)
+        self._stats.update({key: {'mean': mean, 'std': std}})
+
+    def register_manually(self, key: str, mean: Any, std: Any) -> None:
+        """Register data stats (mean and standard deviation) manually.
+
+        Args:
+            key (str):
+                The name of the variable.
+            mean (numeric):
+                The mean. Must be castable to `self.dtype`.
+            std (numeric):
+                The standard deviation. Must be castable to `self.dtype`.
+
+        """
+        self._assert_dtype('key', key, str)
+        mean = self._cast_to_dtype('mean', mean)
+        std = self._cast_to_dtype('std', std)
+
         self._stats.update({key: {'mean': mean, 'std': std}})
 
     def register_dict(self, d: Dict[str, Union[np.ndarray, torch.Tensor]]) -> None:
@@ -329,6 +351,32 @@ class Normalize(object):
                 'dict contains values that are neither of type torch.Tensor nor '
                 f'np.ndarray, but type `{first_item.dtype}`.'
             )
+
+    def _cast_to_dtype(self, key: str, x: Any) -> 'self.dtype':
+        """Cast a number to the `self.dtype`.
+
+        key (str):
+            The value name.
+        x (Any):
+            A number that can be cast to `self.dtype`.
+
+        Returns:
+            self.dtype: A number of type `self.dtype`.
+        """
+        try:
+            t = self.dtype(x)
+        except:
+            raise ValueError(
+                f'failed to cast {key}=`{x}` to type {self.dtype.__name__}.'
+            )
+
+        if t.ndim != 0:
+        raise ValueError(
+            f'casted `{key}={x}` to type {self.dtype.__name__}. Result ({t}) must be a '
+            f'0-D array, but is {t.ndim}-D.'
+        )
+
+        return t
 
     def save(self, path: str) -> None:
         """Save object to file. Can be restored later using `.load(...)`.
