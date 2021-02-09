@@ -371,10 +371,10 @@ class Normalize(object):
             )
 
         if t.ndim != 0:
-        raise ValueError(
-            f'casted `{key}={x}` to type {self.dtype.__name__}. Result ({t}) must be a '
-            f'0-D array, but is {t.ndim}-D.'
-        )
+            raise ValueError(
+                f'casted `{key}={x}` to type {self.dtype.__name__}. Result ({t}) must be a '
+                f'0-D array, but is {t.ndim}-D.'
+            )
 
         return t
 
