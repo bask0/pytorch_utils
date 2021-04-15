@@ -1,5 +1,8 @@
 import numpy as np
+import xarray as xr
 import torch
+
+import pickle
 
 from typing import List, Dict, Iterable, Tuple, Union, Any, Optional
 
@@ -17,7 +20,7 @@ class Normalize(object):
 
         Example:
             Register variables:
-            
+
             >>> n = Normalize()
             >>> n.register('var_a', torch.arange(10))
             >>> n.register('var_b', np.random.normal(loc=2, scale=10., size=10))
@@ -42,10 +45,10 @@ class Normalize(object):
             >>> n.normalize('var_a', np.arange(10)).std()
             1.000000003595229
 
-            Unnormalize data:
+            Denormalize data:
 
-            >>> # A standard normal distributed torch.Tensor is unnormalized.
-            >>> n.unnormalize('var_b', torch.randn(100)).std()
+            >>> # A standard normal distributed torch.Tensor is denormalized.
+            >>> n.denormalize('var_b', torch.randn(100)).std()
             10.12
 
             Normalize dict:
@@ -56,7 +59,9 @@ class Normalize(object):
 
             Normalize dict and stack (note that we cannot mix np.ndarrays and torch.Tensors here):
 
-            >>> n.normalize_dict({'var_a': np.arange(2), 'var_b': np.random.normal(loc=2, scale=10., size=2)}, return_stack=True)
+            >>> n.normalize_dict(
+            ...     {'var_a': np.arange(2),
+            ...      'var_b': np.random.normal(loc=2, scale=10., size=2)}, return_stack=True)
             array([[-1.56669891,  0.0801657 ],
                    [-1.2185436 , -0.56352366]])
 
@@ -86,7 +91,7 @@ class Normalize(object):
         """
         return self._transform(key, x, invert=False)
 
-    def unnormalize(
+    def denormalize(
             self,
             key: str,
             x: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
@@ -117,7 +122,7 @@ class Normalize(object):
         Args:
             d (dict):
                 The name of the variable to normlize.
-            variables (List[str]):
+            variables (Optional[List[str]]):
                 Optional subset of variables to return. All variables must be present in `stats`.
             return_stack (bool):
                 Whether to return a stack of all values in `d`. If `False`, a dict with the normalized
@@ -142,7 +147,7 @@ class Normalize(object):
         else:
             return d
 
-    def unnormalize_dict(
+    def denormalize_dict(
             self,
             d: Dict[str, Union[np.ndarray, torch.Tensor]],
             variables: Optional[List[str]] = None,
@@ -154,7 +159,7 @@ class Normalize(object):
         Args:
             d (dict):
                 The name of the variable to un-normlize.
-            variables (List[str]):
+            variables (Optional[List[str]]):
                 Optional subset of variables to return. All variables must be present in `stats`.
             return_stack (bool):
                 Whether to return a stack of all values in `d`. If `False`, a dict with the un-normalized
@@ -172,11 +177,84 @@ class Normalize(object):
             self._assert_dtype('variables', variables, list)
             d = {v: d[v] for v in variables}
 
-        d = self._transform_dict(d, invert=True)
+        d = self._transform_xr(d, invert=True)
         if return_stack:
             return self._stack_dict(d)
         else:
             return d
+
+    def normalize_xr(
+            self,
+            ds: xr.Dataset,
+            variables: Optional[List[str]] = None,
+            return_stack: bool = False) -> Union[Dict[str, Union[xr.Dataset, np.ndarray]]]:
+        """Normalize an xr.Dataset, stats for keys must have been registered previously.
+
+        Normlization: (x - mean) / std
+
+        Args:
+            ds (xr.Dataset):
+                The name of the variable to normlize.
+            variables (Optional[List[str]]):
+                Optional subset of variables to return. All variables must be present in `stats`.
+            return_stack (bool):
+                Whether to return a np.ndarray stack of all variables. If `False`, an xr.Dataset with the normalized
+                data is returned. If `True`, the values are stacked along the last dimension. Defaults to `False`.
+
+        Returns:
+            xr.Dataset, np.ndarray: normalized xr.Dataset. If `return_stack` is `True`, a np.ndarray is returned.
+        """
+        self._assert_dtype('ds', ds, xr.Dataset)
+        self._assert_dtype('return_stack', return_stack, bool)
+
+        if variables is not None:
+            if isinstance(variables, str):
+                variables = [variables]
+            self._assert_dtype('variables', variables, list)
+            ds = ds[variables]
+
+        ds = self._transform_xr(ds, invert=False)
+
+        if return_stack:
+            return ds.to_array().transpose(..., 'variable').values
+        else:
+            return ds
+
+    def denormalize_xr(
+            self,
+            ds: xr.Dataset,
+            variables: Optional[List[str]] = None,
+            return_stack: bool = False) -> Union[Dict[str, Union[xr.Dataset, np.ndarray]]]:
+        """Denormalize an xr.Dataset, stats for keys must have been registered previously.
+
+        Unnormlization: (x - mean) / std
+        Args:
+            ds (xr.Dataset):
+                The name of the variable to normlize.
+            variables (Optional[List[str]]):
+                Optional subset of variables to return. All variables must be present in `stats`.
+            return_stack (bool):
+                Whether to return a np.ndarray stack of all variables. If `False`, an xr.Dataset with the normalized
+                data is returned. If `True`, the values are stacked along the last dimension. Defaults to `False`.
+
+        Returns:
+            xr.Dataset, np.ndarray: normalized xr.Dataset. If `return_stack` is `True`, a np.ndarray is returned.
+        """
+        self._assert_dtype('ds', ds, xr.Dataset)
+        self._assert_dtype('return_stack', return_stack, bool)
+
+        if variables is not None:
+            if isinstance(variables, str):
+                variables = [variables]
+            self._assert_dtype('variables', variables, list)
+            ds = ds[variables]
+
+        ds = self._transform_xr(ds, invert=True)
+
+        if return_stack:
+            return ds.to_array().transpose(..., 'variable').values
+        else:
+            return ds
 
     def register(self, key: str, x: Union[np.ndarray, torch.Tensor]) -> None:
         """Register data stats (mean and standard deviation).
@@ -189,7 +267,7 @@ class Normalize(object):
 
         """
         self._assert_dtype('key', key, str)
-        self._assert_dtype('x', x, (np.ndarray, torch.Tensor))
+        self._assert_dtype('x', x, (np.ndarray, torch.Tensor, xr.DataArray))
 
         mean, std = self._get_mean_and_std(x)
         self._stats.update({key: {'mean': mean, 'std': std}})
@@ -211,6 +289,27 @@ class Normalize(object):
         std = self._cast_to_dtype('std', std)
 
         self._stats.update({key: {'mean': mean, 'std': std}})
+
+    def register_xr(self, ds: xr.Dataset, variables: Optional[str] = None) -> None:
+        """Register xarray data stats (mean and standard deviation per variable).
+
+        Args:
+            ds (xr.Dataset):
+                The dataset to record data stats for.
+            variables (Optional[str]):
+                Variable names to register stats for. Defaults to `None` fir all varaibles in the dataset.
+
+        """
+        self._assert_dtype('ds', ds, xr.Dataset)
+        if isinstance(variables, str):
+            variables = [variables]
+        self._assert_dtype('variables', variables, (list, type(None)))
+
+        if variables is None:
+            variables = list(ds.data_vars)
+
+        for variable in variables:
+            self.register(variable, ds[variable])
 
     def register_dict(self, d: Dict[str, Union[np.ndarray, torch.Tensor]]) -> None:
         """Register data stats (mean and standard deviation) for dict elements.
@@ -251,7 +350,7 @@ class Normalize(object):
             self, key: str,
             x: Union[np.ndarray, torch.Tensor],
             invert: bool = False) -> Union[np.ndarray, torch.Tensor]:
-        """Transform data, either normalize or unnormalize (if `invert`)"""
+        """Transform data, either normalize or denormalize (if `invert`)"""
         if key not in self._stats:
             raise KeyError(f'no stats found for key `{key}`.')
         self._assert_dtype('invert', invert, bool)
@@ -269,7 +368,7 @@ class Normalize(object):
             self,
             d: Dict[str, Union[np.ndarray, torch.Tensor]],
             invert: bool = False) -> Dict[str, Union[np.ndarray, torch.Tensor]]:
-        """Transform data, either normalize or unnormalize (if `invert`)"""
+        """Transform data, either normalize or denormalize (if `invert`)"""
         self._assert_dtype('d', d, dict)
 
         r = {}
@@ -277,6 +376,19 @@ class Normalize(object):
             r.update({key: self._transform(key, val, invert=invert)})
 
         return r
+
+    def _transform_xr(
+            self,
+            ds: xr.Dataset,
+            invert: bool = False) -> Dict[str, xr.Dataset]:
+        """Transform xr.Dataset, either normalize or denormalize (if `invert`)"""
+        self._assert_dtype('ds', ds, xr.Dataset)
+
+        ds_norm = xr.Dataset()
+        for variable in ds.data_vars:
+            ds_norm[variable] = self._transform(variable, ds[variable], invert=invert)
+
+        return ds_norm
 
     def _stack_dict(
             self,
@@ -308,7 +420,7 @@ class Normalize(object):
 
         dtype_as_str = dtype.__name__ if isinstance(dtype, type) else ' or '.join([t.__name__ for t in dtype])
         if not isinstance(val, dtype):
-            raise TypeError(f'`{key}` must be of type `{dtype_as_str}` but is `{type(val)}`.')
+            raise TypeError(f'`{key}` must be of type `{dtype_as_str}` but is `{type(val).__name__}`.')
 
     def _assert_iterable(self, key, val):
         """Check if val is an iterable (excluding str).
@@ -322,7 +434,7 @@ class Normalize(object):
         Raises:
             TypeError if not iterable.
         """
-        if not hasattr(keys, '__iter__') or isinstance(val, str):
+        if not hasattr(key, '__iter__') or isinstance(val, str):
             raise TypeError(f'`{key}` must be an iterable but is `{type(val)}`.')
 
     def _contains_torch(self, d: Dict[str, Union[torch.Tensor, np.ndarray, np.floating]]) -> bool:
@@ -337,7 +449,7 @@ class Normalize(object):
 
         Raises:
             ValueError: if not torch.Tensor or np.ndarray.
-        
+
         """
         self._assert_dtype('d', d, dict)
         first_key = list(d.keys())[0]
@@ -352,7 +464,7 @@ class Normalize(object):
                 f'np.ndarray, but type `{first_item.dtype}`.'
             )
 
-    def _cast_to_dtype(self, key: str, x: Any) -> 'self.dtype':
+    def _cast_to_dtype(self, key: str, x: Any) -> Any:
         """Cast a number to the `self.dtype`.
 
         key (str):
@@ -363,9 +475,10 @@ class Normalize(object):
         Returns:
             self.dtype: A number of type `self.dtype`.
         """
+
         try:
             t = self.dtype(x)
-        except:
+        except Exception:
             raise ValueError(
                 f'failed to cast {key}=`{x}` to type {self.dtype.__name__}.'
             )
