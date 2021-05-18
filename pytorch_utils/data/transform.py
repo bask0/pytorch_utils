@@ -15,8 +15,10 @@ class Normalize(object):
             1. Create a new instance `Noramlize()`.
             2. Register variables. This means, a variable name and data is passed and the
                mean and standard deviation is recorded.
-            3. Pass variable (single or multiple ones) to (un-)normalize them using the
+            3. a) Pass variable (single or multiple ones) to (un-)normalize them using the
                stats that were regitered before.
+               b) You can also create torch.nn.Modules using `get_normalization_layer`
+               
 
         Example:
             Register variables:
