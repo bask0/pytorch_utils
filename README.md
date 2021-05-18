@@ -7,6 +7,10 @@ Utilities for building PyTorch pipelines and models
 * `data/transform.py`
   * `Normalize`: register data statistics (numpy, xarray, tensors) for (de-)noramlization, generate torch normalization layers, save and restore.
 
+# Installation
+
+`pip install git+https://github.com/bask0/pytorch_utils.git@master`
+
 # Collaboration
 
 Feel free to add your helper tools here or suggest improvements.
