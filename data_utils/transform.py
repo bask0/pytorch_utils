@@ -346,16 +346,226 @@ class Normalize(object):
         for key in keys:
             self.deleteitem(key)
 
+    def save(self, path: str) -> None:
+        """Save object to file. Can be restored later using `.load(...)`.
+
+        Args:
+            pash (str):
+                File path to save object to.
+        """
+        d_save = self.stats
+        d_save.update({'dtype': self.dtype})
+        with open(path, 'wb') as f:
+            pickle.dump(d_save, f)
+
+    @classmethod
+    def load(cls, path: str) -> 'Normalize':
+        """Load from file.
+
+        Example:
+            >>> n = Normalize()
+            >>> n.register_dict({'var_a': torch.arange(10)})
+            >>> n.save('test.pkl')
+            >>> n_restored = Normalize.load('test.pkl')
+
+        Args:
+            path (str):
+                File path to save object to.
+
+        Returns:
+            Normalize: restored object.
+        """
+        with open(path, 'rb') as f:
+            d = pickle.load(f)
+        dtype = d.pop('dtype')
+        n = cls(dtype)
+        n._set_stats(d)
+        return n
+
+    def get_normalization_layer(
+            self_,
+            variables: Union[List[str], str],
+            invert: bool,
+            stack: bool,
+            stack_along_new_dim: bool,
+            stack_dim=-1) -> torch.nn.Module:
+        """Returns a torch data (de-)normalization layer.
+
+        This is useful to make the code independent from this Normalization
+        module, e.g., saving / loading can be done with PyTorch.
+
+        Args:
+            variabes (List[str] or str):
+                Variables to transform, must have been registered previously.
+            invert (bool):
+                Whether to normalize (`True`) or to denormalize (`False`).
+            stack (bool):
+                Whether to stack dict to tensor along last dimension (`True`) or to return
+                a dic (`False`). Default is `False`.
+            stack_along_new_dim (bool):
+                If `True`, the dict elements are stacked along a new dimension. Example: we have two dict
+                elements, it is len(variables)=2, each with shape (10, 1). With `stack_along_new_dim=False`,
+                the resulting tensor has shape (10, 1, 1), (10, 2) else.
+                Only applies if `stack=True`, default is `True`.
+            stack_dim (int):
+                The dimension along which the resulting tensor is stacked. Depending on `stack_along_new_dim`,
+                either a new dimension is added (`stack_along_new_dim=True`), or else the existing dimensions are
+                stacked. Only applies if `stack=True`, default is -1 (the last one).
+
+        Return:
+            torch.nn.Module: a normalization layer.
+
+        """
+
+        # Check types to avoid runtime errors.
+        self_._assert_dtype('variables', variables, (str, list))
+        self_._assert_dtype('invert', invert, bool)
+        self_._assert_dtype('stack', stack, bool)
+        self_._assert_dtype('stack_along_new_dim', stack_along_new_dim, bool)
+        self_._assert_dtype('stack_dim', stack_dim, int)
+
+        class DataNorm(torch.nn.Module):
+            """Normalization layer for (optionally inverse) standard normal distribution tranfrormation.
+
+            Attributes:
+                stats (Dict[str, Dict[str, float]]):
+                    Dictionary contining variables (keys), each with `mean`: (float)
+                    and `std` (float) stats. Signature: dict(var_a=dict(mean=0.1, std=0.8)).
+                variables (List[str]):
+                    List of variables to transform, must be present in `stats`.
+                invert (bool):
+                    If `True`, the transformation is inverted, e.g., de-normalization is done.
+                stack (bool):
+                    If `True`, the transformed dict is stacked along last dimension. Else, a dict
+                    containing transformed data is returned.
+                stack_along_new_dim (bool):
+                    If `True`, the dict elements are stacked along a new dimension. Example: we have two dict
+                    elements, it is len(variables)=2, each with shape (10, 1). With `stack_along_new_dim=False`,
+                    the resulting tensor has shape (10, 1, 1), (10, 2) else.
+                    Only applies if `stack=True`, default is `True`.
+                stack_dim (int):
+                    The dimension along which the resulting tensor is stacked. Depending on `stack_along_new_dim`,
+                    either a new dimension is added (`stack_along_new_dim=True`), or else the existing dimensions are
+                    stacked. Only applies if `stack=True`, default is -1 (the last one).
+
+            Args (__call__):
+                x: dict[str, Tensor]
+
+            Usage:
+                norm_layer = NormLayer('varname', invert=False)
+                denorm_layer = NormLayer('varname', invert=True)
+                x = dict(varname=torch.randn(10))
+                assert torch.isclose(
+                        x['varname'],
+                        denorm_layer(norm_layer(x))['varname'],
+                    )
+            """
+            def __init__(self) -> None:
+                super().__init__()
+
+                self.variables = [variables] if isinstance(variables, str) else variables
+                self.invert = invert
+                self.stack = stack
+                self.stack_along_new_dim = stack_along_new_dim
+                self.stack_dim = stack_dim
+
+                missing = []
+                for var in self.variables:
+                    if var not in self_.stats:
+                        missing.append(var)
+
+                if len(missing) > 0:
+                    raise KeyError(f'no stats found for key(s): `{*missing, }`.')
+
+                self._stats = {var: self_.stats[var] for var in self.variables}
+
+            def forward(self, x: Union[torch.Tensor, Dict[str, torch.Tensor]]) -> torch.Tensor:
+                """Transform input.
+
+                Args:
+                    x (Dict[str: torch.Tensor] or torch.Tensor):
+                        - a dict of variable, value pairs. Keys must be present in `stats`, or
+                        - a tensor with last dimension matching the number of `variables`. The order
+                          is assumed to correspond to `variables`.
+
+                Returns:
+                    Either a dict of key, value (torch.Tensor) pairs (if `stack=True`), or a torch.Tensor
+                    with variable stacked in last dimension.
+                """
+
+                if not isinstance(x, (dict, torch.Tensor)):
+                    raise TypeError(
+                        f'`x` must be of type `dict` or `torch.Tensor` but is `{type(x).__name__}`.'
+                    )
+
+                if isinstance(x, torch.Tensor):
+                    x = self._tensor_to_dict(x)
+
+                out = {k: self._normalize(k, x[k]) for k, v in self.stats.items()}
+
+                if self.stack:
+                    if self.stack_along_new_dim:
+                        return torch.stack(list(out.values()), dim=self.stack_dim)
+                    else:
+                        return torch.cat(list(out.values()), dim=self.stack_dim)
+                else:
+                    return out
+
+            def _normalize(self, key, val) -> torch.Tensor:
+                """Normalize single variable."""
+
+                if key not in self.stats:
+                    raise KeyError(f'no stats found for key `{key}`.')
+
+                stats = self.stats[key]
+                mn = stats['mean']
+                st = stats['std']
+
+                if self.invert:
+                    return val * st + mn
+                else:
+                    return (val - mn) / st
+
+            def _tensor_to_dict(self, x):
+                if x.shape[-1] != len(self.variables):
+                    raise ValueError(
+                        f'`x` last dimension ({x.shape[-1]}) must match number of '
+                        f'target variables ({len(self.variables)}).'
+                    )
+
+                return {t: x[..., i] for i, t in enumerate(self.variables)}
+
+            @property
+            def stats(self) -> Dict:
+                """A dict containing means and standard deviations."""
+                return self._stats
+
+            def __str__(self) -> str:
+                layer_name = 'DataDenorm' if self.invert else 'DataNorm'
+                stack = f'stack={self.stack}'
+                s = f'{layer_name}(variables=[{", ".join(self.variables)}], {stack})'
+                return s
+
+            def __repr__(self) -> str:
+                return self.__str__()
+
+        return DataNorm()
+
+    @property
+    def stats(self) -> Dict:
+        """A dict containing means and standard deviations."""
+        return self._stats
+
     def _transform(
             self, key: str,
             x: Union[np.ndarray, torch.Tensor],
             invert: bool = False) -> Union[np.ndarray, torch.Tensor]:
         """Transform data, either normalize or denormalize (if `invert`)"""
-        if key not in self._stats:
+        if key not in self.stats:
             raise KeyError(f'no stats found for key `{key}`.')
         self._assert_dtype('invert', invert, bool)
 
-        stats = self._stats[key]
+        stats = self.stats[key]
         m = stats['mean']
         s = stats['std']
 
@@ -422,7 +632,7 @@ class Normalize(object):
         if not isinstance(val, dtype):
             raise TypeError(f'`{key}` must be of type `{dtype_as_str}` but is `{type(val).__name__}`.')
 
-    def _assert_iterable(self, key, val):
+    def _assert_iterable(self, key, val) -> None:
         """Check if val is an iterable (excluding str).
 
         Args:
@@ -490,47 +700,6 @@ class Normalize(object):
             )
 
         return t
-
-    def save(self, path: str) -> None:
-        """Save object to file. Can be restored later using `.load(...)`.
-
-        Args:
-            pash (str):
-                File path to save object to.
-        """
-        d_save = self.stats
-        d_save.update({'dtype': self.dtype})
-        with open(path, 'wb') as f:
-            pickle.dump(d_save, f)
-
-    @classmethod
-    def load(cls, path: str) -> 'Normalize':
-        """Load from file.
-
-        Example:
-            >>> n = Normalize()
-            >>> n.register_dict({'var_a': torch.arange(10)})
-            >>> n.save('test.pkl')
-            >>> n_restored = Normalize.load('test.pkl')
-
-        Args:
-            path (str):
-                File path to save object to.
-
-        Returns:
-            Normalize: restored object.
-        """
-        with open(path, 'rb') as f:
-            d = pickle.load(f)
-        dtype = d.pop('dtype')
-        n = cls(dtype)
-        n._set_stats(d)
-        return n
-
-    @property
-    def stats(self):
-        """A dict containing means and standard deviations."""
-        return self._stats
 
     def _set_stats(self, d: Dict[str, Dict[str, float]]) -> None:
         """Assign stats dict. Internal use only, do not use.
