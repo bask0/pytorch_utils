@@ -386,8 +386,8 @@ class Normalize(object):
             self_,
             variables: Union[List[str], str],
             invert: bool,
-            stack: bool,
-            stack_along_new_dim: bool,
+            stack: bool = False,
+            stack_along_new_dim: bool = True,
             stack_dim=-1) -> torch.nn.Module:
         """Returns a torch data (de-)normalization layer.
 
