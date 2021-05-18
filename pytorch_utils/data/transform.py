@@ -449,7 +449,7 @@ class Normalize(object):
                     stacked. Only applies if `stack=True`, default is -1 (the last one).
 
             Args (__call__):
-                x: dict[str, Tensor]
+                x: dict[str, Tensor] or Tensor
 
             Usage:
                 norm_layer = NormLayer('varname', invert=False)
