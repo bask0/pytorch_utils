@@ -13,6 +13,7 @@ setup(
     author_email="bkraft.work@gmail.com",
     description=("Utitlities for building PyTorch models and pipelines."),
     license="MIT",
+    packages=["pytorch_utils"],
     url="https://github.com/bask0/pytorch_utils",
     long_description=read('README.md'),
     classifiers=[
