@@ -2,16 +2,44 @@ import torch
 from torch import nn
 
 
-class L2loss(nn.Module):
-    """L2 norm loss between elements of input and target, ignores NaN in target.
+class RegressionLoss(nn.Module):
+    """L1 and L2 loss functions between elements of input and target, ignores NaN in target.
 
-    The loss funtion allows for having missing values in the target. The loss is first calculated per sample and then
-    averaged over the batch dimension.
+    The loss funtion allows for having missing / non-finite values in the target.
+
+    Example
+    -------
+    >>> mse_loss = RegressionLoss(sample_wise=True)
+    >>> input = torch.ones(2, 2, requires_grad=True)
+    >>> target = torch.ones(2, 2, requires_grad=False) + 1.
+    >>> target[0, 0] = float('NaN')
+    >>> loss = mse_loss(input, target)
+    >>> loss.backward()
+    >>> print('input:\n', input)
+    >>> print('target:\n', target)
+    >>> print('mse:\n', loss)
+    >>> print('gradients:\n', input.grad)
+    input:
+     tensor([[1., 1.],
+             [1., 1.]], requires_grad=True)
+    target:
+     tensor([[nan, 2.],
+             [2., 2.]])
+    mse:
+     tensor(1., grad_fn=<MeanBackward0>)
+    gradients:
+     tensor([[ 0.0000, -1.0000],
+             [-0.5000, -0.5000]])
 
     Parameters
     ----------
-    mode : str ("mse" | "rmse")
-        Either "mse" (default) for Mean Squared Error (MSE) or "rmse"s for Root Mean Squared Error (RMSE).
+    mode : str ("mse" | "rmse" | "mae")
+        Either "mse" (default) for Mean Squared Error (MSE), "rmse" for Root Mean Squared Error (RMSE), or "mae"
+        for Mean Absolute Error (MAE).
+    sample_wise : bool
+        Whether to calculate sample-wise loss first and average then (`True`, default) or to calculate the loss across
+        all elements. The former weights each sample equally, the latter weights each observation equally. This is
+        relevant especially with many NaN in the target tensor, while there is no diffeence without NaN.
 
     Shape
     -----
@@ -19,14 +47,16 @@ class L2loss(nn.Module):
     * target: (N, *), same shape as the input
 
     """
-    def __init__(self, mode: str='mse') -> None:
-        super(L2loss, self).__init__()
+    def __init__(self, mode: str = 'mse', sample_wise: bool = True) -> None:
+        super(RegressionLoss, self).__init__()
 
-        if mode not in ('mse', 'rmse'):
+        if mode not in ('mse', 'rmse', 'mae'):
             raise ValueError(
-                f'argument `mode` must be one of ("mse" | "rmse"), is {mode}.'
+                f'argument `mode` must be one of ("mse" | "rmse" | "mae"), is {mode}.'
             )
 
+        self.mode = mode
+        self.sample_wise = sample_wise
         self.mask: torch.Tensor
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -35,24 +65,21 @@ class L2loss(nn.Module):
         input.register_hook(lambda grad: grad.where(mask, torch.zeros(1)))
         data_dims = tuple(range(1, input.ndim))
 
-        se = (input - target) ** 2
-        se = se.where(mask, input)
-        num_valid = mask.float().sum(data_dims)
-        mse = torch.mean(se.sum(data_dims) / num_valid)
+        target = target.where(mask, input)
 
-        if mode == 'mse':
-            return mse
+        if self.mode == 'mae':
+            err = (input - target).abs()
         else:
-            return torch.sqrt(mse)
+            err = (input - target) ** 2
 
+        if self.sample_wise:
+            num_valid = mask.float().sum(data_dims)
+            merr = torch.mean(err.sum(data_dims) / num_valid)
+        else:
+            num_valid = mask.float().sum()
+            merr = err.sum() / num_valid
 
-
-mse_loss = MSE()
-
-input = torch.ones(3, 5, 6, requires_grad=True)
-target = torch.ones(3, 5, 6, requires_grad=False) + 0.1
-target[0, 0] = float('NaN')
-
-output = mse_loss(input, target)
-print('mse: ', output)
-output.backward()
+        if self.mode == 'rmse':
+            return torch.sqrt(merr)
+        else:
+            return merr
