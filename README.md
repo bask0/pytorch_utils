@@ -4,8 +4,10 @@ Utilities for building PyTorch pipelines and models
 
 # List of tools
 
-* `data/transform.py`
+* `transformation/normalize.py`
   * `Normalize`: register data statistics (numpy, xarray, tensors) for (de-)noramlization, generate torch normalization layers, save and restore.
+* `layers/lossfn.py`
+  * `RegressionLoss`: L1 and L2 loss functions for missing values in target.
 
 # Installation
 
