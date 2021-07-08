@@ -1,3 +1,5 @@
+"""Custom loss funtions for PyTorch."""
+
 import torch
 from torch import nn
 
