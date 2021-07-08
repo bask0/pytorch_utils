@@ -618,7 +618,9 @@ class Normalize(object):
         x: Union[np.ndarray, torch.Tensor, float]
     ) -> Tuple[float, float]:
         """Calculate mean and standard deviation for np.ndarray or torch.Tensor."""
-        return np.nanmean(x).astype(self.dtype), np.nanstd(x).astype(self.dtype)
+        mn = np.nanmean(x).astype(self.dtype)
+        std = np.nanstd(x).astype(self.dtype)
+        return mn, std
 
     def _assert_dtype(self, key: str, val: Any, dtype: Union[type, Tuple[type, ...]]) -> None:
         """Check the type and raise TypeError if wrong.
