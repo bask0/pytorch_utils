@@ -1,3 +1,5 @@
+"""Data normalization for numpy, xarray, and Pytorch tensors."""
+
 import numpy as np
 import xarray as xr
 import torch
@@ -9,7 +11,7 @@ from typing import List, Dict, Iterable, Tuple, Union, Any, Optional
 
 class Normalize(object):
     def __init__(self, dtype: type = np.float32) -> None:
-        """Data normalization functionality for torch.Tensor and np.ndarrays.
+        """Data normalization functionality for torch.Tensor, xarray.Datasets, and np.ndarrays.
 
         Usage:
             1. Create a new instance `Noramlize()`.
@@ -18,7 +20,6 @@ class Normalize(object):
             3. a) Pass variable (single or multiple ones) to (un-)normalize them using the
                stats that were regitered before.
                b) You can also create torch.nn.Modules using `get_normalization_layer`
-               
 
         Example:
             Register variables:
@@ -114,7 +115,7 @@ class Normalize(object):
 
     def normalize_dict(
             self,
-            d: Dict[str, Union[np.ndarray, torch.Tensor]],
+            d: Dict[str, Union[np.ndarray, torch.Tensor, float]],
             variables: Optional[List[str]] = None,
             return_stack: bool = False) -> Union[Dict[str, Union[np.ndarray, torch.Tensor]], np.ndarray, torch.Tensor]:
         """Normalize data in `d`, stats for keys must have been registered previously.
@@ -272,7 +273,7 @@ class Normalize(object):
         self._assert_dtype('x', x, (np.ndarray, torch.Tensor, xr.DataArray))
 
         mean, std = self._get_mean_and_std(x)
-        self._stats.update({key: {'mean': mean, 'std': std}})
+        self._update_stats({key: {'mean': mean, 'std': std}})
 
     def register_manually(self, key: str, mean: Any, std: Any) -> None:
         """Register data stats (mean and standard deviation) manually.
@@ -292,7 +293,7 @@ class Normalize(object):
 
         self._stats.update({key: {'mean': mean, 'std': std}})
 
-    def register_xr(self, ds: xr.Dataset, variables: Optional[str] = None) -> None:
+    def register_xr(self, ds: xr.Dataset, variables: Optional[Union[str, List[str]]] = None) -> None:
         """Register xarray data stats (mean and standard deviation per variable).
 
         Args:
@@ -418,7 +419,6 @@ class Normalize(object):
             torch.nn.Module: a normalization layer.
 
         """
-
         # Check types to avoid runtime errors.
         self_._assert_dtype('variables', variables, (str, list))
         self_._assert_dtype('invert', invert, bool)
@@ -481,7 +481,9 @@ class Normalize(object):
 
                 self._stats = {var: self_.stats[var] for var in self.variables}
 
-            def forward(self, x: Union[torch.Tensor, Dict[str, torch.Tensor]]) -> torch.Tensor:
+            def forward(
+                    self,
+                    x: Union[torch.Tensor, Dict[str, torch.Tensor]]) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
                 """Transform input.
 
                 Args:
@@ -560,7 +562,7 @@ class Normalize(object):
 
     def _transform(
             self, key: str,
-            x: Union[np.ndarray, torch.Tensor],
+            x: Union[np.ndarray, torch.Tensor, float],
             invert: bool = False) -> Union[np.ndarray, torch.Tensor]:
         """Transform data, either normalize or denormalize (if `invert`)"""
         if key not in self.stats:
@@ -578,8 +580,8 @@ class Normalize(object):
 
     def _transform_dict(
             self,
-            d: Dict[str, Union[np.ndarray, torch.Tensor]],
-            invert: bool = False) -> Dict[str, Union[np.ndarray, torch.Tensor]]:
+            d: Dict[str, Union[np.ndarray, torch.Tensor, float]],
+            invert: bool = False) -> Dict[str, Union[np.ndarray, torch.Tensor, float]]:
         """Transform data, either normalize or denormalize (if `invert`)"""
         self._assert_dtype('d', d, dict)
 
@@ -592,7 +594,7 @@ class Normalize(object):
     def _transform_xr(
             self,
             ds: xr.Dataset,
-            invert: bool = False) -> Dict[str, xr.Dataset]:
+            invert: bool = False) -> xr.Dataset:
         """Transform xr.Dataset, either normalize or denormalize (if `invert`)"""
         self._assert_dtype('ds', ds, xr.Dataset)
 
@@ -604,18 +606,21 @@ class Normalize(object):
 
     def _stack_dict(
             self,
-            d: Dict[str, Union[np.ndarray, torch.Tensor]]) -> Union[np.ndarray, torch.Tensor]:
+            d: Dict[str, Union[np.ndarray, torch.Tensor, float]]) -> Union[np.ndarray, torch.Tensor]:
         """Stack values in a dict along last dimension."""
         if self._contains_torch(d):
             return torch.stack(list(d.values()), dim=-1)
         else:
             return np.stack(list(d.values()), axis=-1)
 
-    def _get_mean_and_std(self, x: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
+    def _get_mean_and_std(
+        self,
+        x: Union[np.ndarray, torch.Tensor, float]
+    ) -> Tuple[float, float]:
         """Calculate mean and standard deviation for np.ndarray or torch.Tensor."""
         return np.nanmean(x).astype(self.dtype), np.nanstd(x).astype(self.dtype)
 
-    def _assert_dtype(self, key: str, val: Any, dtype: Union[type, Tuple[type]]) -> None:
+    def _assert_dtype(self, key: str, val: Any, dtype: Union[type, Tuple[type, ...]]) -> None:
         """Check the type and raise TypeError if wrong.
 
         Args:
@@ -634,7 +639,7 @@ class Normalize(object):
         if not isinstance(val, dtype):
             raise TypeError(f'`{key}` must be of type `{dtype_as_str}` but is `{type(val).__name__}`.')
 
-    def _assert_iterable(self, key, val) -> None:
+    def _assert_iterable(self, key: str, val: Any) -> None:
         """Check if val is an iterable (excluding str).
 
         Args:
@@ -649,8 +654,8 @@ class Normalize(object):
         if not hasattr(key, '__iter__') or isinstance(val, str):
             raise TypeError(f'`{key}` must be an iterable but is `{type(val)}`.')
 
-    def _contains_torch(self, d: Dict[str, Union[torch.Tensor, np.ndarray, np.floating]]) -> bool:
-        """Checks if a dict contains a torch.Tensor or a np.ndarray.
+    def _contains_torch(self, d: Dict[str, Union[torch.Tensor, np.ndarray, float]]) -> bool:
+        """Checks if a dict contains torch.Tensor or np.ndarray.
 
         Args:
         d (dict):
@@ -668,12 +673,12 @@ class Normalize(object):
         first_item = d[first_key]
         if isinstance(first_item, torch.Tensor):
             return True
-        elif isinstance(first_item, (np.ndarray, np.floating)):
+        elif isinstance(first_item, np.ndarray) or np.issubdtype(first_item, np.floating):
             return False
         else:
             raise ValueError(
                 'dict contains values that are neither of type torch.Tensor nor '
-                f'np.ndarray, but type `{first_item.dtype}`.'
+                f'np.ndarray, but type `{type(first_item).__name__}`.'
             )
 
     def _cast_to_dtype(self, key: str, x: Any) -> Any:
@@ -703,8 +708,8 @@ class Normalize(object):
 
         return t
 
-    def _set_stats(self, d: Dict[str, Dict[str, float]]) -> None:
-        """Assign stats dict. Internal use only, do not use.
+    def _update_stats(self, d: Dict[str, Dict[str, float]]):
+        """Update stats dict. Internal use only, do not use.
 
         Args:
             d (dict):
@@ -718,6 +723,16 @@ class Normalize(object):
                     f'tried to assign stats dict, but d[`{key}`] does not have keys `mean` and `std`.'
                 )
         self._stats = d
+
+    def _set_stats(self, d: Dict[str, Dict[str, float]]) -> None:
+        """Assign stats dict. Internal use only, do not use.
+
+        Args:
+            d (dict):
+                A dict of variable means and standard deviations: {'var_a': {'mean': __, 'std': __}}.
+        """
+        self._stats = {}
+        self._update_stats(d)
 
     def __str__(self) -> str:
         s = f'Normalize(dtype={self.dtype.__name__})\n{"-"* 40}\n'
