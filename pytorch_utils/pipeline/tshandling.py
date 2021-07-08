@@ -43,7 +43,7 @@ def get_init_arguments(cls) -> List[str]:
     return [arg[0] for arg in get_init_arguments_and_types(cls)]
 
 
-class SeqSamplerScheme(object):
+class SeqScheme(object):
     r"""Handles sampling from time series with missing values.
 
     This class handles sampling strategies for multivariate datasets (with features, `f` and targets, `t`) with
@@ -320,7 +320,7 @@ class SeqSamplerScheme(object):
         return f_sel, t_sel
 
     @classmethod
-    def test(cls, seed=0, **kwargs) -> Tuple[SeqSamplerScheme, xr.Dataset]:
+    def test(cls, seed=0, **kwargs) -> Tuple[SeqScheme, xr.Dataset]:
         """"Generate a test instance using dummy data.
 
         Parameters
@@ -328,12 +328,12 @@ class SeqSamplerScheme(object):
         seed: int
             A random seed, default is 0.
         **kwargs:
-            Keyword arguments are passed to SeqSamplerScheme(**kwargs).
+            Keyword arguments are passed to SeqScheme(**kwargs).
 
         Returns
         -------
         A tuple:
-            SeqSamplerScheme: the test sampler.
+            SeqScheme: the test sampler.
             xr.Dataset: the dummy data.
         """
         random_state = np.random.RandomState(seed=seed)
@@ -368,7 +368,7 @@ class SeqSamplerScheme(object):
         seed: int
             A random seed, default is 0.
         **kwargs:
-            Keyword arguments are passed to SeqSamplerScheme(**kwargs).
+            Keyword arguments are passed to SeqScheme(**kwargs).
         """
         ts, ds = cls.test(seed=seed, **kwargs)
 
