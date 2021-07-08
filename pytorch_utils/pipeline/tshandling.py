@@ -44,10 +44,10 @@ def get_init_arguments(cls) -> List[str]:
 
 
 class SeqScheme(object):
-    r"""Create training tuples for sequential data with different strategies and deal with missing values.
+    r"""Training strategies for sequential xarray data, deals with missing values.
 
-    This class handles sampling strategies for multivariate datasets (with features, `f` and targets, `t`) with
-    options to account for missing data, different sampling scheemes, and prediction modes.
+    This class provides training strategies for multivariate sequential datasets (with features, `f` and targets, `t`)
+    with options to account for missing data, different training strategies, and prediction modes.
 
     TODO: provide mask?
 
