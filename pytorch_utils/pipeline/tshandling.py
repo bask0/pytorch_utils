@@ -49,6 +49,8 @@ class TSampler(object):
     This class handles sampling strategies for multivariate datasets (with features, `f` and targets, `t`) with
     options to account for missing data, different sampling scheemes, and prediction modes.
 
+    TODO: provide mask?
+
     Prediction scheme
     -----------------
     The prediction scheme if defined by `f_window_size`, `t_window_size`, and `predict_shift`. Some examples, with
