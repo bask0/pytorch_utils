@@ -1,4 +1,4 @@
-"""Tools to deal with time-series data pipelines."""
+"""Tools to deal with sequential data pipelines."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def get_init_arguments(cls) -> List[str]:
 
 
 class SeqScheme(object):
-    r"""Handles sampling from time series with missing values.
+    r"""Handles sampling from sequential data with missing values.
 
     This class handles sampling strategies for multivariate datasets (with features, `f` and targets, `t`) with
     options to account for missing data, different sampling scheemes, and prediction modes.
