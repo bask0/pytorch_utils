@@ -10,7 +10,7 @@ Utilities for building PyTorch pipelines and models
 * `layers/lossfn.py`
   * `RegressionLoss`: L1 and L2 loss functions for missing values in target.
 * `pipeline/tshandling.py`:
-  * `SeqScheme`: Create training tuples for sequential data with different strategies and deal with missing values
+  * `SeqScheme`: Training strategies for sequential xarray data, deals with missing values.
 
 ## Installation
 
