@@ -402,7 +402,7 @@ class TSampler(object):
             bbox_to_anchor=(0., 1.2, 2., .102), loc=3,
             ncol=6, mode="expand", borderaxespad=0.
         )
- 
+
     def __repr__(self) -> str:
         perc_masked = 100 - int(self.mask.sum() / np.product(self.mask.shape) * 100)
         args = []
