@@ -1,5 +1,5 @@
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 def read(fname):
@@ -13,7 +13,7 @@ setup(
     author_email="bkraft.work@gmail.com",
     description=("Utitlities for building PyTorch models and pipelines."),
     license="MIT",
-    packages=["pytorch_utils"],
+    packages=find_packages(),
     url="https://github.com/bask0/pytorch_utils",
     long_description=read('README.md'),
     classifiers=[
