@@ -226,6 +226,7 @@ class SeqScheme(object):
             raise RuntimeError(
                 'the length of the coordinates is 0, no samples can be generated.'
             )
+        self.perc_masked = 100 - int(self.mask.sum() / np.product(self.mask.shape) * 100)
 
     def _get_roll_nonmissing(self, x: xr.Dataset, mode: str, roll_dim: str, roll_size: int) -> xr.DataArray:
         """Generate a mask f missing values in a moving window.
@@ -404,7 +405,7 @@ class SeqScheme(object):
         )
 
     def __repr__(self) -> str:
-        perc_masked = 100 - int(self.mask.sum() / np.product(self.mask.shape) * 100)
+        
         args = []
         max_len = 0
         for k in get_init_arguments(type(self)):
@@ -419,7 +420,7 @@ class SeqScheme(object):
         s = self.__class__.__name__
         s += f'(\n    {args}\n)'
         s += f'\n{"-" * (max_len + 6)}'
-        s += f'\n  ~{perc_masked}% are masked out'
+        s += f'\n  ~{self.perc_masked}% are masked out'
         return s
 
     def __str__(self) -> str:
