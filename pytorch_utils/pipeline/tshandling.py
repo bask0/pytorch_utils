@@ -229,7 +229,7 @@ class SeqScheme(object):
         self.perc_masked = 100 - int(self.mask.sum() / np.product(self.mask.shape) * 100)
 
     def _get_roll_nonmissing(self, x: xr.Dataset, mode: str, roll_dim: str, roll_size: int) -> xr.DataArray:
-        """Generate a mask f missing values in a moving window.
+        """Generate a mask of missing values in a moving window.
 
         Parameters
         ----------
