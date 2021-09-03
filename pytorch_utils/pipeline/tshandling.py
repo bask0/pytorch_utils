@@ -236,8 +236,8 @@ class SeqScheme(object):
         x: xr.Dataset
             The dataset.
         mode: str
-            Whether all variables must be present or any.
-        roll_dim : str)
+            Whether all variables must be present in the rolling window (`all`) or any (`any`).
+        roll_dim : str
             The dimension to apply moving window on.
         roll_size : int
             The moving window size.
