@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 from typing import List, Union, Tuple, Dict, Any
 import inspect
+import re
 
 
 def get_init_arguments_and_types(cls) -> List[Tuple[str, Tuple, Any]]:
@@ -104,6 +105,10 @@ class SeqScheme(object):
                 = =                           = =
         f : | - o o o o - |         X : | - o o o o - |
 
+    Irregular frequencies
+    ---------------------
+    With irregular frequency units as argument `f_window_size` or `t_window_size` (years: 'Y' and months: 'M') the targets always covers the largest possible time range (e.g., 31 days '1M' and 366 days for 'Y') and the features cover the shortest possible range. For example, with `f_window_size=2M` and `t_window_size=1M`, the target covers the exact range (t_days) and the features cover 59 days (28 + 30) - t_days, i.e., the shortest possible combination of two months.
+
     Parameters
     ----------
     ds : xr.Dataset
@@ -112,12 +117,12 @@ class SeqScheme(object):
         The features (herein: `f`).
     targets : List of str or str
         The targets (herein: `t`).
-    f_window_size : int >= 1
+    f_window_size : Union[int >= 1]
         The feature window size along the `seq_dim` (e.g., `time`), i.e., how many steps in a given dimension the
         features must be present. The default (1) is a special case, where no antecedent sequence elements are
-        used ('instantaneous model').
+        used ('instantaneous model'). If the argument is a string it is interpreted as a pandas-like offset (see `pandas offset-aliases`), such as '1Y' for one year, or '2M' for two month. Only works if `seq_dim` is a time axis. The argument is used to find instances of the frequencies that satisfy the conditions given by `f_allow_miss` and `f_require_all`, i.e., if `f_allow_miss==True`, only some values must be present in each frequency unit, etc. Note that only 'Y' (yearly), 'M' (monthly), and 'W' (weekly) are supported currently.
         See `Prediction scheme` for more information.
-    t_window_size : int >= 1
+    t_window_size : Union[int >= 1, str]
         The target window size along the `seq_dim` (e.g., `time`), i.e., how many steps in a given dimension the
         targets must be present. The default (1) is the most common case, where 1 value is predicted.
         See `Prediction scheme` for more information.
@@ -184,6 +189,8 @@ class SeqScheme(object):
         self.f_require_all = f_require_all
         self.t_require_all = t_require_all
         self.seq_dim = seq_dim
+
+        self.seq_data = ds[self.seq_dim]
 
         window_valid = xr.Dataset(
             {
@@ -255,6 +262,92 @@ class SeqScheme(object):
                 f'arg `mode` must be one of `all` | `any`, is `{mode}`.'
             )
         return fn(x.to_array('variable').notnull()).astype(int).rolling({roll_dim: roll_size}).sum() == roll_size
+
+    def _handle_freq(
+            self,
+            freq: str) -> Tuple[int, int]:
+        """Get sequence lengths in days from a pandas-style frequancy tag.
+
+        Two lengths are returned, the minimum possible days that could be covered by the frequency (e.g., 355 days
+        for '1Y'/one year, or 28 days for '1M'/one month) and the maximum frequency (e.g., 356 days for '1Y'/one year,
+        or 31 days for '1M'/one month)
+
+        Parameters
+        ----------
+        freq : str
+            A pandas-like time frequency. The units sopported are: (`Y` | `A` | `M` | `W`).
+
+        Returns
+        -------
+        seq_len_min : int
+            The minimum of days that could be covered by the given frequency.
+        seq_len_max : int
+            The maximum of days that could be covered by the given frequency.
+        """
+
+        dig_search = re.search(r'\d+', freq)
+
+        if dig_search is None:
+            raise ValueError(
+                f'frequency signature `{freq}` is invalid. It must start with an integer and end with a frequnecy.')
+
+        cut_index = dig_search.span()[1]
+        num_unit = int(freq[:cut_index])
+        freq_unit = freq[cut_index:]
+
+        if num_unit < 1:
+            raise ValueError(
+                f'invalid frequency signature `{freq}`. Frequency must be <= 1.')
+
+        if freq_unit == 'A':
+            freq_unit = 'Y'
+
+        if freq_unit == 'W':
+            seq_len_min = seq_len_max = 7 * num_unit
+        elif freq_unit == 'M':
+            seq_sums = self.seq_data.resample(
+                {self.seq_dim: freq}).last().dt.daysinmonth.rolling({self.seq_dim: num_unit}).sum()
+            seq_len_min = int(seq_sums.min().item())
+            seq_len_max = int(seq_sums.max().item())
+        elif freq_unit == 'Y':
+            seq_sums = self.seq_data.resample(
+                {self.seq_dim: '1M'}).last().dt.daysinmonth.rolling({self.seq_dim: num_unit * 12}).sum()
+            seq_len_min = int(seq_sums.min().item())
+            seq_len_max = int(seq_sums.max().item())
+        else:
+            raise ValueError(
+                f'invalid frequency signature `{freq}`. Frequency unit must be one of (`Y` | `A` | `M` | `W`).')
+
+        return seq_len_min, seq_len_max
+
+    def _get_freq_len(
+            self,
+            f_freq: str,
+            t_freq: str) -> Tuple[int, int]:
+        """Get sequence lengths in days from a pandas-style frequancy tag for features and targets.
+
+        Two lengths are returned, the minimum possible days that could be covered by the frequency (e.g., 355 days
+        for '1Y'/one year, or 28 days for '1M'/one month) for the features and the maximum (e.g., 356 days
+        for '1Y'/one year, or 31 days for '1M'/one month) for hte targets.
+
+        Parameters
+        ----------
+        t_freq : str
+            A pandas-like time frequency for the features, one of (`Y`=year | `A`=year | `M`=month | `W`=week).
+        t_freq : str
+            A pandas-like time frequency for the targets, one of (`Y`=year | `A`=year | `M`=month | `W`=week).
+
+        Returns
+        -------
+        seq_len_min : int
+            The minimum of days that could be covered by the given frequency.
+        seq_len_max : int
+            The maximum of days that could be covered by the given frequency.
+        """
+        f_len, _ = self._handle_freq(freq=f_freq)
+        _, t_len = self._handle_freq(freq=t_freq)
+
+        return f_len, t_len
 
     def __len__(self) -> int:
         """Returns the length, i.e., number of coords."""
@@ -405,7 +498,6 @@ class SeqScheme(object):
         )
 
     def __repr__(self) -> str:
-        
         args = []
         max_len = 0
         for k in get_init_arguments(type(self)):
