@@ -109,18 +109,18 @@ class Normalize(object):
             self,
             key: str,
             x: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
-        """De-normalize `x`, stats for `key` must have been registered previously.
+        """Denormalize `x`, stats for `key` must have been registered previously.
 
-        De-normlization: x * std + mean
+        Denormlization: x * std + mean
 
         Args:
             key (str):
-                The name of the variable to de-normlize.
+                The name of the variable to denormlize.
             x (np.ndarray or torch.Tensor):
-                The data to de-normalize.
+                The data to denormalize.
 
         Returns:
-            np.ndarray or torch.Tensor: de-normalized data, same type as input.
+            np.ndarray or torch.Tensor: denormalized data, same type as input.
         """
         return self._transform(key, x, invert=True)
 
@@ -166,22 +166,22 @@ class Normalize(object):
             d: Dict[str, Union[np.ndarray, torch.Tensor]],
             variables: Optional[List[str]] = None,
             return_stack: bool = False) -> Union[Dict[str, Union[np.ndarray, torch.Tensor]], np.ndarray, torch.Tensor]:
-        """De-normalize data in `d`, stats for keys must have been registered previously.
+        """Denormalize data in `d`, stats for keys must have been registered previously.
 
-        De-normlization: x * std + mean
+        Denormlization: x * std + mean
 
         Args:
             d (dict):
-                The name of the variable to de-normlize.
+                The name of the variable to denormlize.
             variables (Optional[List[str]]):
                 Optional subset of variables to return. All variables must be present in `stats`.
             return_stack (bool):
-                Whether to return a stack of all values in `d`. If `False`, a dict with the de-normalized
+                Whether to return a stack of all values in `d`. If `False`, a dict with the denormalized
                 data is returned. If `True`, the values are stacked along the last dimension. The values
                 can be troch.Tensors or np.ndarrays. Defaults to `False`.
 
         Returns:
-            dict, np.ndarray, torch.Tensor: de-normalized data, same type as input. If `return_stack`
+            dict, np.ndarray, torch.Tensor: denormalized data, same type as input. If `return_stack`
                 is `True`, a np.ndarray or torch.Tensor is returned.
         """
         self._assert_dtype('d', d, dict)
@@ -241,7 +241,7 @@ class Normalize(object):
             return_stack: bool = False) -> Union[Dict[str, Union[xr.Dataset, np.ndarray]]]:
         """Denormalize an xr.Dataset, stats for keys must have been registered previously.
 
-        Unnormlization: (x - mean) / std
+        Denormlization: (x - mean) / std
         Args:
             ds (xr.Dataset):
                 The name of the variable to normlize.
@@ -447,7 +447,7 @@ class Normalize(object):
                 variables (List[str]):
                     List of variables to transform, must be present in `stats`.
                 invert (bool):
-                    If `True`, the transformation is inverted, e.g., de-normalization is done.
+                    If `True`, the transformation is inverted, e.g., denormalization is done.
                 stack (bool):
                     If `True`, the transformed dict is stacked along last dimension. Else, a dict
                     containing transformed data is returned.
