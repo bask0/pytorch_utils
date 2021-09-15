@@ -21,7 +21,7 @@ class Normalize(object):
             1. Create a new instance `Noramlize()`.
             2. Register variables. This means, a variable name and data is passed and the
                mean and standard deviation is recorded.
-            3. a) Pass variable (single or multiple ones) to (un-)normalize them using the
+            3. a) Pass variable (single or multiple ones) to (de-)normalize them using the
                stats that were regitered before.
                b) You can also create torch.nn.Modules using `get_normalization_layer`
 
@@ -109,18 +109,18 @@ class Normalize(object):
             self,
             key: str,
             x: Union[np.ndarray, torch.Tensor]) -> Union[np.ndarray, torch.Tensor]:
-        """Un-normalize `x`, stats for `key` must have been registered previously.
+        """De-normalize `x`, stats for `key` must have been registered previously.
 
-        Un-normlization: x * std + mean
+        De-normlization: x * std + mean
 
         Args:
             key (str):
-                The name of the variable to un-normlize.
+                The name of the variable to de-normlize.
             x (np.ndarray or torch.Tensor):
-                The data to un-normalize.
+                The data to de-normalize.
 
         Returns:
-            np.ndarray or torch.Tensor: un-normalized data, same type as input.
+            np.ndarray or torch.Tensor: de-normalized data, same type as input.
         """
         return self._transform(key, x, invert=True)
 
@@ -166,22 +166,22 @@ class Normalize(object):
             d: Dict[str, Union[np.ndarray, torch.Tensor]],
             variables: Optional[List[str]] = None,
             return_stack: bool = False) -> Union[Dict[str, Union[np.ndarray, torch.Tensor]], np.ndarray, torch.Tensor]:
-        """Un-normalize data in `d`, stats for keys must have been registered previously.
+        """De-normalize data in `d`, stats for keys must have been registered previously.
 
-        Un-normlization: x * std + mean
+        De-normlization: x * std + mean
 
         Args:
             d (dict):
-                The name of the variable to un-normlize.
+                The name of the variable to de-normlize.
             variables (Optional[List[str]]):
                 Optional subset of variables to return. All variables must be present in `stats`.
             return_stack (bool):
-                Whether to return a stack of all values in `d`. If `False`, a dict with the un-normalized
+                Whether to return a stack of all values in `d`. If `False`, a dict with the de-normalized
                 data is returned. If `True`, the values are stacked along the last dimension. The values
                 can be troch.Tensors or np.ndarrays. Defaults to `False`.
 
         Returns:
-            dict, np.ndarray, torch.Tensor: un-normalized data, same type as input. If `return_stack`
+            dict, np.ndarray, torch.Tensor: de-normalized data, same type as input. If `return_stack`
                 is `True`, a np.ndarray or torch.Tensor is returned.
         """
         self._assert_dtype('d', d, dict)
