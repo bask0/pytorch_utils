@@ -201,7 +201,7 @@ class Normalize(object):
             self,
             ds: xr.Dataset,
             variables: Optional[List[str]] = None,
-            return_stack: bool = False) -> Union[Dict[str, Union[xr.Dataset, np.ndarray]]]:
+            return_stack: bool = False) -> Union[xr.Dataset, Dict[str, Union[xr.Dataset, np.ndarray]]]:
         """Normalize an xr.Dataset, stats for keys must have been registered previously.
 
         Normlization: (x - mean) / std
@@ -238,7 +238,7 @@ class Normalize(object):
             self,
             ds: xr.Dataset,
             variables: Optional[List[str]] = None,
-            return_stack: bool = False) -> Union[Dict[str, Union[xr.Dataset, np.ndarray]]]:
+            return_stack: bool = False) -> Union[xr.Dataset, Dict[str, Union[xr.Dataset, np.ndarray]]]:
         """Denormalize an xr.Dataset, stats for keys must have been registered previously.
 
         Denormlization: (x - mean) / std
