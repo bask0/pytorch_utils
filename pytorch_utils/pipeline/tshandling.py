@@ -117,10 +117,11 @@ class SeqScheme(object):
         The features (herein: `f`).
     targets : List of str or str
         The targets (herein: `t`).
-    f_window_size : Union[int >= 1]
+    f_window_size : Union[int >= 1, str]
         The feature window size along the `seq_dim` (e.g., `time`), i.e., how many steps in a given dimension the
         features must be present. The default (1) is a special case, where no antecedent sequence elements are
-        used ('instantaneous model'). If the argument is a string it is interpreted as a pandas-like offset (see `pandas offset-aliases`), such as '1Y' for one year, or '2M' for two month. Only works if `seq_dim` is a time axis. The argument is used to find instances of the frequencies that satisfy the conditions given by `f_allow_miss` and `f_require_all`, i.e., if `f_allow_miss==True`, only some values must be present in each frequency unit, etc. Note that only 'Y' (yearly), 'M' (monthly), and 'W' (weekly) are supported currently.
+        used ('instantaneous model'). If the argument is a string it is interpreted as a pandas-like offset (see
+        `pandas offset-aliases`), such as '1Y' for one year, or '2M' for two month. Only works if `seq_dim` is a time axis. The argument is used to find instances of the frequencies that satisfy the conditions given by `f_allow_miss` and `f_require_all`, i.e., if `f_allow_miss==True`, only some values must be present in each frequency unit, etc. Note that only 'Y' (yearly), 'M' (monthly), and 'W' (weekly) are supported currently.
         See `Prediction scheme` for more information.
     t_window_size : Union[int >= 1, str]
         The target window size along the `seq_dim` (e.g., `time`), i.e., how many steps in a given dimension the
@@ -153,8 +154,8 @@ class SeqScheme(object):
             ds: xr.Dataset,
             features: Union[List[str], str],
             targets: Union[List[str], str],
-            f_window_size: int = 1,
-            t_window_size: int = 1,
+            f_window_size: Union[int, str] = 1,
+            t_window_size: Union[int, str] = 1,
             predict_shift: int = 0,
             f_allow_miss: bool = False,
             t_allow_miss: bool = False,
@@ -181,7 +182,10 @@ class SeqScheme(object):
                     f'argument `{k}` cannot be > seq_len={seq_len}, is {v}.'
                 )
 
-        self.f_window_size = f_window_size
+        if isinstance(f_window_size, str) and isinstance(t_window_size, str):
+            self.f_window_size = f_window_size
+
+
         self.t_window_size = t_window_size
         self.predict_shift = predict_shift
         self.f_allow_miss = f_allow_miss
@@ -191,6 +195,7 @@ class SeqScheme(object):
         self.seq_dim = seq_dim
 
         self.seq_data = ds[self.seq_dim]
+
 
         window_valid = xr.Dataset(
             {

@@ -724,7 +724,7 @@ class Normalize(object):
                 raise ValueError(
                     f'tried to assign stats dict, but d[`{key}`] does not have keys `mean` and `std`.'
                 )
-        self._stats = d
+        self._stats.update(d)
 
     def _set_stats(self, d: Dict[str, Dict[str, float]]) -> None:
         """Assign stats dict. Internal use only, do not use.
