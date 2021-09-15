@@ -10,10 +10,14 @@ from typing import List, Dict, Iterable, Tuple, Union, Any, Optional
 
 
 class Normalize(object):
-    def __init__(self, dtype: type = np.float32) -> None:
+    def __init__(
+            self,
+            dtype: type = np.float32) -> None:
         """Data normalization functionality for torch.Tensor, xarray.Datasets, and np.ndarrays.
 
-        Usage:
+        Usage
+        -----
+
             1. Create a new instance `Noramlize()`.
             2. Register variables. This means, a variable name and data is passed and the
                mean and standard deviation is recorded.
@@ -21,7 +25,9 @@ class Normalize(object):
                stats that were regitered before.
                b) You can also create torch.nn.Modules using `get_normalization_layer`
 
-        Example:
+        Example
+        -------
+
             Register variables:
 
             >>> n = Normalize()
@@ -71,6 +77,11 @@ class Normalize(object):
             Register stats manually:
 
             n.register_manually('my_var', mean=1.0, std=2.5)
+
+        Parameters
+        ----------
+        dtype (dtype):
+            The data type of the transformed data. Deault is np.float32.
 
         """
         self._stats = {}
