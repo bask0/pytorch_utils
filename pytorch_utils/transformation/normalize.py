@@ -391,7 +391,7 @@ class Normalize(object):
             invert: bool,
             stack: bool = False,
             stack_along_new_dim: bool = True,
-            stack_dim=-1) -> torch.nn.Module:
+            stack_dim: int = -1) -> torch.nn.Module:
         """Returns a torch data (de-)normalization layer.
 
         This is useful to make the code independent from this Normalization
@@ -599,6 +599,7 @@ class Normalize(object):
         self._assert_dtype('ds', ds, xr.Dataset)
 
         ds_norm = xr.Dataset()
+
         for variable in ds.data_vars:
             ds_norm[variable] = self._transform(variable, ds[variable], invert=invert)
 
