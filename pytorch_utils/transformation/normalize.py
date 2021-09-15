@@ -15,8 +15,7 @@ class Normalize(object):
             dtype: type = np.float32) -> None:
         """Data normalization functionality for torch.Tensor, xarray.Datasets, and np.ndarrays.
 
-        Usage
-        -----
+        Usage:
 
             1. Create a new instance `Noramlize()`.
             2. Register variables. This means, a variable name and data is passed and the
@@ -25,8 +24,7 @@ class Normalize(object):
                stats that were regitered before.
                b) You can also create torch.nn.Modules using `get_normalization_layer`
 
-        Example
-        -------
+        Example:
 
             Register variables:
 
@@ -78,10 +76,9 @@ class Normalize(object):
 
             n.register_manually('my_var', mean=1.0, std=2.5)
 
-        Parameters
-        ----------
-        dtype (dtype):
-            The data type of the transformed data. Deault is np.float32.
+        Args:
+            dtype (dtype):
+                The data type of the transformed data. Deault is np.float32.
 
         """
         self._stats = {}
@@ -201,7 +198,8 @@ class Normalize(object):
             self,
             ds: xr.Dataset,
             variables: Optional[List[str]] = None,
-            return_stack: bool = False) -> Union[xr.Dataset, Dict[str, Union[xr.Dataset, np.ndarray]]]:
+            return_stack: bool = False,
+            keep_all_variables: bool = False) -> Union[xr.Dataset, Dict[str, Union[xr.Dataset, np.ndarray]]]:
         """Normalize an xr.Dataset, stats for keys must have been registered previously.
 
         Normlization: (x - mean) / std
@@ -214,6 +212,10 @@ class Normalize(object):
             return_stack (bool):
                 Whether to return a np.ndarray stack of all variables. If `False`, an xr.Dataset with the normalized
                 data is returned. If `True`, the values are stacked along the last dimension. Defaults to `False`.
+            keep_all_variables (bool):
+                Whether to keep all variables in `ds`, even if not in `variables`. Default is `False`. Note that if
+                `keep_all_variables=True`, `return_stack=True` may cause errors as variables may be kept in `ds` that
+                have different dimensionality.
 
         Returns:
             xr.Dataset, np.ndarray: normalized xr.Dataset. If `return_stack` is `True`, a np.ndarray is returned.
@@ -225,9 +227,17 @@ class Normalize(object):
             if isinstance(variables, str):
                 variables = [variables]
             self._assert_dtype('variables', variables, list)
+
+            if keep_all_variables:
+                keep_vars = list(set(ds.data_vars) - set(variables))
+                keep_ds = ds[keep_vars]
+
             ds = ds[variables]
 
         ds = self._transform_xr(ds, invert=False)
+
+        if keep_all_variables:
+            ds = xr.merge((ds, keep_ds))
 
         if return_stack:
             return ds.to_array().transpose(..., 'variable').values
@@ -238,7 +248,8 @@ class Normalize(object):
             self,
             ds: xr.Dataset,
             variables: Optional[List[str]] = None,
-            return_stack: bool = False) -> Union[xr.Dataset, Dict[str, Union[xr.Dataset, np.ndarray]]]:
+            return_stack: bool = False,
+            keep_all_variables: bool = False) -> Union[xr.Dataset, Dict[str, Union[xr.Dataset, np.ndarray]]]:
         """Denormalize an xr.Dataset, stats for keys must have been registered previously.
 
         Denormlization: (x - mean) / std
@@ -250,6 +261,10 @@ class Normalize(object):
             return_stack (bool):
                 Whether to return a np.ndarray stack of all variables. If `False`, an xr.Dataset with the normalized
                 data is returned. If `True`, the values are stacked along the last dimension. Defaults to `False`.
+            keep_all_variables (bool):
+                Whether to keep all variables in `ds`, even if not in `variables`. Default is `False`. Note that if
+                `keep_all_variables=True`, `return_stack=True` may cause errors as variables may be kept in `ds` that
+                have different dimensionality.
 
         Returns:
             xr.Dataset, np.ndarray: normalized xr.Dataset. If `return_stack` is `True`, a np.ndarray is returned.
@@ -261,9 +276,17 @@ class Normalize(object):
             if isinstance(variables, str):
                 variables = [variables]
             self._assert_dtype('variables', variables, list)
+
+            if keep_all_variables:
+                keep_vars = list(set(ds.data_vars) - set(variables))
+                keep_ds = ds[keep_vars]
+
             ds = ds[variables]
 
         ds = self._transform_xr(ds, invert=True)
+
+        if keep_all_variables:
+            ds = xr.merge((ds, keep_ds))
 
         if return_stack:
             return ds.to_array().transpose(..., 'variable').values
