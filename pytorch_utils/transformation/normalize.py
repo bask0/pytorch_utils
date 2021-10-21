@@ -1,4 +1,7 @@
-"""Data normalization for numpy, xarray, and Pytorch tensors."""
+"""Data normalization for numpy, xarray, and Pytorch tensors.
+
+Author: Basil Kraft
+"""
 
 import numpy as np
 import xarray as xr
