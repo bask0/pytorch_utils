@@ -1,4 +1,7 @@
-"""Tools to deal with sequential data pipelines."""
+"""Tools to deal with sequential data pipelines.
+
+Author: Basil Kraft
+"""
 
 from __future__ import annotations
 
