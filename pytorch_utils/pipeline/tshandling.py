@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import xarray as xr
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
-from typing import List, Union, Tuple, Dict, Any
+from typing import List, Type, Union, Tuple, Dict, Any
 import inspect
 import re
 
@@ -110,7 +111,10 @@ class SeqScheme(object):
 
     Irregular frequencies
     ---------------------
-    With irregular frequency units as argument `f_window_size` or `t_window_size` (years: 'Y' and months: 'M') the targets always covers the largest possible time range (e.g., 31 days '1M' and 366 days for 'Y') and the features cover the shortest possible range. For example, with `f_window_size=2M` and `t_window_size=1M`, the target covers the exact range (t_days) and the features cover 59 days (28 + 30) - t_days, i.e., the shortest possible combination of two months.
+    With irregular frequency units as argument `f_window_size` or `t_window_size` (years: 'Y' and months: 'M') the
+    targets always covers the largest possible time range (e.g., 31 days '1M' and 366 days for 'Y') and the features
+    cover the shortest possible range. For example, with `f_window_size=2M` and `t_window_size=1M`, the target covers the exact range (t_days) and the features cover 59 days (28 + 30) - t_days, i.e., the shortest possible
+    combination of two months.
 
     Parameters
     ----------
@@ -124,12 +128,15 @@ class SeqScheme(object):
         The feature window size along the `seq_dim` (e.g., `time`), i.e., how many steps in a given dimension the
         features must be present. The default (1) is a special case, where no antecedent sequence elements are
         used ('instantaneous model'). If the argument is a string it is interpreted as a pandas-like offset (see
-        `pandas offset-aliases`), such as '1Y' for one year, or '2M' for two month. Only works if `seq_dim` is a time axis. The argument is used to find instances of the frequencies that satisfy the conditions given by `f_allow_miss` and `f_require_all`, i.e., if `f_allow_miss==True`, only some values must be present in each frequency unit, etc. Note that only 'Y' (yearly), 'M' (monthly), and 'W' (weekly) are supported currently.
-        See `Prediction scheme` for more information.
+        `pandas offset-aliases`), such as '1Y' for one year, or '2M' for two month. Only works if `seq_dim` is a time
+        axis. The argument is used to find instances of the frequencies that satisfy the conditions given by
+        `f_allow_miss` and `f_require_all`, i.e., if `f_allow_miss==True`, only some values must be present in each
+        frequency unit, etc. Note that only 'Y' (year), 'M' (month), 'W' (week), 'D' (day), and `H` (hour) are
+        supported currently. See `Prediction scheme` for more information.
     t_window_size : Union[int >= 1, str]
         The target window size along the `seq_dim` (e.g., `time`), i.e., how many steps in a given dimension the
         targets must be present. The default (1) is the most common case, where 1 value is predicted.
-        See `Prediction scheme` for more information.
+        See `t_window_size` for supported frequencies and `Prediction scheme` for more information.
     predict_shift : int
         An integer indicating the shift of the target compared to the features. The default, 0, means that no shift
         is done, positive values indicate that the prediction is done n steps into the future. Negative values
@@ -176,19 +183,35 @@ class SeqScheme(object):
 
         seq_len = len(ds[seq_dim])
         for k, v in [['f_window_size', f_window_size], ['t_window_size', t_window_size]]:
-            if v < 1:
+            if not isinstance(v, str):
+                if v < 1:
+                    raise ValueError(
+                        f'argument `{k}` cannot be < 1, is {v}.'
+                    )
+                if v > seq_len:
+                    raise ValueError(
+                        f'argument `{k}` cannot be > seq_len={seq_len}, is {v}.'
+                    )
+
+        if isinstance(f_window_size, str) or isinstance(t_window_size, str):
+            if not xr.core.dtypes.is_datetime_like(ds[seq_dim]):
                 raise ValueError(
-                    f'argument `{k}` cannot be < 1, is {v}.'
-                )
-            if v > seq_len:
-                raise ValueError(
-                    f'argument `{k}` cannot be > seq_len={seq_len}, is {v}.'
+                    'cannot use frequency strings for `f_window_size` and `t_window_size` as the frequency '
+                    f'dimension `{seq_dim}` is not datetime like. Use integers to indicate window sizes.'
                 )
 
-        if isinstance(f_window_size, str) and isinstance(t_window_size, str):
-            self.f_window_size = f_window_size
+        self.time_freq = pd.infer_freq(ds[seq_dim].values)
+        if self.time_freq not in ['D', 'H']:
+            raise TypeError(
+                f'The time frequency must either be daily (`D`) of hourly (`H`), is `{self.time_freq}`.'
+            )
 
+        if isinstance(f_window_size, str):
+            f_window_size, _ = self._handle_freq(freq=f_window_size)
+        if isinstance(t_window_size, str):
+            _, t_window_size = self._handle_freq(freq=t_window_size)
 
+        self.f_window_size = f_window_size
         self.t_window_size = t_window_size
         self.predict_shift = predict_shift
         self.f_allow_miss = f_allow_miss
@@ -198,7 +221,6 @@ class SeqScheme(object):
         self.seq_dim = seq_dim
 
         self.seq_data = ds[self.seq_dim]
-
 
         window_valid = xr.Dataset(
             {
@@ -276,14 +298,14 @@ class SeqScheme(object):
             freq: str) -> Tuple[int, int]:
         """Get sequence lengths in days from a pandas-style frequancy tag.
 
-        Two lengths are returned, the minimum possible days that could be covered by the frequency (e.g., 355 days
-        for '1Y'/one year, or 28 days for '1M'/one month) and the maximum frequency (e.g., 356 days for '1Y'/one year,
+        Two lengths are returned, the minimum possible days that could be covered by the frequency (e.g., 365 days
+        for '1Y'/one year, or 28 days for '1M'/one month) and the maximum frequency (e.g., 366 days for '1Y'/one year,
         or 31 days for '1M'/one month)
 
         Parameters
         ----------
         freq : str
-            A pandas-like time frequency. The units sopported are: (`Y` | `A` | `M` | `W`).
+            A pandas-like time frequency. The units sopported are: (`Y` | `A` | `M` | `W` | `D` | `H`).
 
         Returns
         -------
@@ -310,7 +332,13 @@ class SeqScheme(object):
         if freq_unit == 'A':
             freq_unit = 'Y'
 
-        if freq_unit == 'W':
+        if freq_unit == 'H':
+            if self.time_freq == 'D':
+                raise ValueError('`freq` cannot be `H` as the dataset has daily frequency.')
+            seq_len_min = seq_len_max = num_unit
+        elif freq_unit == 'D':
+            seq_len_min = seq_len_max = num_unit
+        elif freq_unit == 'W':
             seq_len_min = seq_len_max = 7 * num_unit
         elif freq_unit == 'M':
             seq_sums = self.seq_data.resample(
@@ -325,6 +353,10 @@ class SeqScheme(object):
         else:
             raise ValueError(
                 f'invalid frequency signature `{freq}`. Frequency unit must be one of (`Y` | `A` | `M` | `W`).')
+
+        if (self.time_freq == 'H') and (freq_unit != 'H'):
+            seq_len_min *= 24
+            seq_len_max *= 24
 
         return seq_len_min, seq_len_max
 
@@ -422,13 +454,15 @@ class SeqScheme(object):
         return f_sel, t_sel
 
     @classmethod
-    def test(cls, seed=0, **kwargs) -> Tuple[SeqScheme, xr.Dataset]:
+    def test(cls, seed=0, timefreq='', **kwargs) -> Tuple[SeqScheme, xr.Dataset]:
         """"Generate a test instance using dummy data.
 
         Parameters
         ----------
         seed: int
             A random seed, default is 0.
+        timefreq: str
+            Frequency of the time axis, e.g., `H`, default behaviour is to not make sequential axis temporal.
         **kwargs:
             Keyword arguments are passed to SeqScheme(**kwargs).
 
@@ -445,7 +479,7 @@ class SeqScheme(object):
             for i in range(num_var):
                 v_list = []
                 for _ in range(num_sites):
-                    v = np.arange(20.)
+                    v = np.arange(48.)
                     s = random_state.choice(len(v), num_nan)
                     v[s] = np.nan
                     v_list.append(v)
@@ -453,6 +487,9 @@ class SeqScheme(object):
             return ds
 
         ds = new_var(3, num_nan=5)
+        if timefreq != '':
+            ds = ds.assign_coords(time=pd.date_range(start='2000-01-01', periods=48, freq=timefreq))
+
         test_sampler = cls(ds, ['var_00', 'var_01'], ['var_02'], **kwargs)
 
         ds['feature_mask'] = xr.DataArray(test_sampler.f_mask, dims=['site', 'time'])
@@ -462,17 +499,19 @@ class SeqScheme(object):
         return test_sampler, ds
 
     @classmethod
-    def test_plot(cls, seed=0, **kwargs) -> None:
+    def test_plot(cls, seed=0, timefreq='', **kwargs) -> None:
         """"Generate a test plot with dummy data.
 
         Parameters
         ----------
         seed: int
             A random seed, default is 0.
+        timefreq: str
+            Frequency of the time axis, e.g., `H`, default behaviour is to not make sequential axis temporal.
         **kwargs:
             Keyword arguments are passed to SeqScheme(**kwargs).
         """
-        ts, ds = cls.test(seed=seed, **kwargs)
+        ts, ds = cls.test(seed=seed, timefreq=timefreq, **kwargs)
 
         print(ts)
 
