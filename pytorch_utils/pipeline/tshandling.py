@@ -175,6 +175,13 @@ class SeqScheme(object):
 
         self.features = [features] if isinstance(features, str) else features
         self.targets = [targets] if isinstance(targets, str) else targets
+        self.predict_shift = predict_shift
+        self.f_allow_miss = f_allow_miss
+        self.t_allow_miss = t_allow_miss
+        self.f_require_all = f_require_all
+        self.t_require_all = t_require_all
+        self.seq_dim = seq_dim
+        self.seq_data = ds[self.seq_dim]
 
         if seq_dim not in ds.dims:
             raise ValueError(
@@ -213,14 +220,6 @@ class SeqScheme(object):
 
         self.f_window_size = f_window_size
         self.t_window_size = t_window_size
-        self.predict_shift = predict_shift
-        self.f_allow_miss = f_allow_miss
-        self.t_allow_miss = t_allow_miss
-        self.f_require_all = f_require_all
-        self.t_require_all = t_require_all
-        self.seq_dim = seq_dim
-
-        self.seq_data = ds[self.seq_dim]
 
         window_valid = xr.Dataset(
             {
