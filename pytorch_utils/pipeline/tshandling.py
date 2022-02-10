@@ -157,7 +157,7 @@ class SeqScheme(object):
         If `True` (default), the features are masked if ANY feature is missing and else if ALL features are missing.
         In other words, if you want *at least one* feature to be present, set `False`, if you want *all* features to
         be present, set `True`.
-    t_allow_miss : bool
+    t_require_all : bool
         If `True` (default), the targets are masked if ANY targets is missing and else if ALL features are missing.
         In other words, if you want *at least* one target to be present, set `False`, if you want *all* targets to
         be present, set `True`.
