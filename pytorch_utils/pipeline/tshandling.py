@@ -311,7 +311,7 @@ class SeqScheme(object):
             raise ValueError(
                 f'arg `mode` must be one of `all` | `any`, is `{mode}`.'
             )
-        return fn(x.to_array('variable').notnull()).astype(int).rolling({roll_dim: roll_size}).sum() == roll_size
+        return fn(x.to_array('variable')).astype(int).rolling({roll_dim: roll_size}).sum() == roll_size
 
     def _handle_freq(
             self,
