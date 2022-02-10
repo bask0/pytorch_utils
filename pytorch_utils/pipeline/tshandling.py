@@ -237,8 +237,8 @@ class SeqScheme(object):
 
         if (not t_allow_miss) and (t_fraction_required < 1.0):
             raise ValueError(
-                '`t_allow_miss=False` implies that no values can be missing in the target, but you also passed a '
-                'value of `t_fraction_required={t_fraction_required}`. This is not allowed.'
+                '`t_allow_miss=False` implies that no values can be missing in the target window, but you also '
+                f'passed a value of `t_fraction_required={t_fraction_required}`. This is not allowed.'
             )
 
         self.f_window_size = f_window_size
