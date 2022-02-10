@@ -204,18 +204,17 @@ class SeqScheme(object):
             )
 
         seq_len = len(ds[seq_dim])
-        f_full_seq = False
-        t_full_seq = False
+        full_seq = False
         if (f_window_size == -1) ^ (t_window_size == -1):
             raise ValueError(
                 'set neither or both of `f_window_size` and `t_window_size` to -1.'
             )
         if f_window_size == -1:
             f_window_size = seq_len
-            f_full_seq = True
+            full_seq = True
         if t_window_size == -1:
             t_window_size = seq_len
-            t_full_seq = True
+
         for k, v in [['f_window_size', f_window_size], ['t_window_size', t_window_size]]:
             if not isinstance(v, str):
                 if v < 1:
@@ -263,7 +262,7 @@ class SeqScheme(object):
         else:
             t = ds[targets].notnull()
 
-        if f_full_seq:
+        if full_seq:
             f_mask = xr.zeros_like(ds[features[0]], dtype='bool')
             f_mask[{seq_dim: -1}] = True
         else:
@@ -275,7 +274,7 @@ class SeqScheme(object):
                 min_required=f_frac
             ).compute()
 
-        if t_full_seq:
+        if full_seq:
             t_mask = xr.zeros_like(ds[features[0]], dtype='bool')
             t_mask[{seq_dim: -1}] = True
         else:
@@ -294,11 +293,15 @@ class SeqScheme(object):
         self.t_mask = t_mask
         self.mask = mask.compute()
         self.coords = np.argwhere(self.mask.values)
-        # if len(self.coords) == 0:
-        #     raise RuntimeError(
-        #         'the length of the coordinates is 0, no samples can be generated.'
-        #     )
-        self.perc_masked = 100 - int(self.mask.sum() / np.product(self.mask.shape) * 100)
+        if len(self.coords) == 0:
+            raise RuntimeError(
+                'the length of the coordinates is 0, no samples can be generated.'
+            )
+
+        self.perc_masked = 100 - int(
+            (
+                self.mask.sum() + np.product(self.mask[{seq_dim: 0}].shape) * (t_window_size - 1)
+            ) / np.product(self.mask.shape) * 100)
 
     def _get_roll_nonmissing(
             self,
