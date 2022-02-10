@@ -149,6 +149,10 @@ class SeqScheme(object):
     t_allow_miss : bool
         Whether missing targets are allowed within the moving window. If `True`, targets are not checked.
         Default is `False`.
+    t_fraction_required: float (0.0, 1.0]
+        The fraction of values that must be present in `t_window_size`. E.g., with 0.5, 50 % of the values must be
+        present in the widow. Default is 1.0, meaning that all values must be present. Must not be passed
+        if `t_allow_miss = False`.
     f_require_all : bool
         If `True` (default), the features are masked if ANY feature is missing and else if ALL features are missing.
         In other words, if you want *at least one* feature to be present, set `False`, if you want *all* features to
@@ -176,6 +180,7 @@ class SeqScheme(object):
             predict_shift: int = 0,
             f_allow_miss: bool = False,
             t_allow_miss: bool = False,
+            t_fraction_required: float = 1.0,
             f_require_all: bool = True,
             t_require_all: bool = True,
             f_is_qc: bool = True,
@@ -187,6 +192,7 @@ class SeqScheme(object):
         self.predict_shift = predict_shift
         self.f_allow_miss = f_allow_miss
         self.t_allow_miss = t_allow_miss
+        self.t_fraction_required = t_fraction_required
         self.f_require_all = f_require_all
         self.t_require_all = t_require_all
         self.f_is_qc = f_is_qc
@@ -229,6 +235,12 @@ class SeqScheme(object):
         if isinstance(t_window_size, str):
             _, t_window_size = self._handle_freq(freq=t_window_size)
 
+        if (not t_allow_miss) and (t_fraction_required < 1.0):
+            raise ValueError(
+                '`t_allow_miss=False` implies that no values can be missing in the target, but you also passed a '
+                'value of `t_fraction_required={t_fraction_required}`. This is not allowed.'
+            )
+
         self.f_window_size = f_window_size
         self.t_window_size = t_window_size
 
@@ -259,7 +271,8 @@ class SeqScheme(object):
                 x=t,
                 mode='all' if t_require_all else 'any',
                 roll_dim=seq_dim,
-                roll_size=t_window_size
+                roll_size=t_window_size,
+                min_required=t_fraction_required
             ).shift(time=-predict_shift, fill_value=False).compute()
 
         mask = f_mask & t_mask
@@ -275,7 +288,13 @@ class SeqScheme(object):
             )
         self.perc_masked = 100 - int(self.mask.sum() / np.product(self.mask.shape) * 100)
 
-    def _get_roll_nonmissing(self, x: xr.Dataset, mode: str, roll_dim: str, roll_size: int) -> xr.DataArray:
+    def _get_roll_nonmissing(
+            self,
+            x: xr.Dataset,
+            mode: str,
+            roll_dim: str,
+            roll_size: int,
+            min_required: float = 1.0) -> xr.DataArray:
         """Generate a mask of missing values in a moving window.
 
         Parameters
@@ -288,6 +307,10 @@ class SeqScheme(object):
             The dimension to apply moving window on.
         roll_size : int
             The moving window size.
+        min_required : float
+            The minimum fraction of values that must be present in the window, a float in the range (0.0, 1,0].
+            Default is 1.0, which means that all values mus be present. With 0.5, for example, 50 % of the values must
+            be present in the window.
 
         Returns
         -------
@@ -301,7 +324,15 @@ class SeqScheme(object):
             raise ValueError(
                 f'arg `mode` must be one of `all` | `any`, is `{mode}`.'
             )
-        return fn(x.to_array('variable')).astype(int).rolling({roll_dim: roll_size}).sum() == roll_size
+
+        if 0.0 < min_required <= 1.0:
+            raise ValueError(
+                'argument `min_required` must be in the range (0.0, 1.0].'
+            )
+
+        min_required = roll_size * min_required
+
+        return fn(x.to_array('variable')).astype(int).rolling({roll_dim: roll_size}).sum() >= min_required
 
     def _handle_freq(
             self,
