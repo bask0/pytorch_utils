@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from typing import List, Type, Union, Tuple, Dict, Any
+from typing import List, Union, Tuple, Dict, Any
 import inspect
 import re
 
@@ -113,7 +113,8 @@ class SeqScheme(object):
     ---------------------
     With irregular frequency units as argument `f_window_size` or `t_window_size` (years: 'Y' and months: 'M') the
     targets always covers the largest possible time range (e.g., 31 days '1M' and 366 days for 'Y') and the features
-    cover the shortest possible range. For example, with `f_window_size=2M` and `t_window_size=1M`, the target covers the exact range (t_days) and the features cover 59 days (28 + 30) - t_days, i.e., the shortest possible
+    cover the shortest possible range. For example, with `f_window_size=2M` and `t_window_size=1M`, the target covers
+    the exact range (t_days) and the features cover 59 days (28 + 30) - t_days, i.e., the shortest possible
     combination of two months.
 
     Parameters
@@ -156,6 +157,12 @@ class SeqScheme(object):
         If `True` (default), the targets are masked if ANY targets is missing and else if ALL features are missing.
         In other words, if you want *at least* one target to be present, set `False`, if you want *all* targets to
         be present, set `True`.
+    f_is_qc: bool
+        If `True` (default), the features are interpreted as quality control data, meaning that values of `1` are
+        `valid`, everything else including NaN is interpreted as `missing`. Otherwise (`False`), finite values are
+        interpreted as `valid`, which excludes NaN and inf.
+    t_is_qc: bool
+        Same as `f_is_qc` with `True` as default, but for targets.
     seq_dim : str
         The sequence dimension, default is `time`. Must be present in `ds`.
     """
@@ -171,6 +178,8 @@ class SeqScheme(object):
             t_allow_miss: bool = False,
             f_require_all: bool = True,
             t_require_all: bool = True,
+            f_is_qc: bool = True,
+            t_is_qc: bool = True,
             seq_dim: str = 'time') -> None:
 
         self.features = [features] if isinstance(features, str) else features
@@ -180,6 +189,8 @@ class SeqScheme(object):
         self.t_allow_miss = t_allow_miss
         self.f_require_all = f_require_all
         self.t_require_all = t_require_all
+        self.f_is_qc = f_is_qc
+        self.t_is_qc = t_is_qc
         self.seq_dim = seq_dim
         self.seq_data = ds[self.seq_dim]
 
@@ -221,18 +232,28 @@ class SeqScheme(object):
         self.f_window_size = f_window_size
         self.t_window_size = t_window_size
 
+        if self.f_is_qc:
+            f = ds[features].isin(1)
+        else:
+            f = ds[features].notnull()
+
+        if self.t_is_qc:
+            t = ds[targets].isin(1)
+        else:
+            t = ds[targets].notnull()
+
         window_valid = xr.Dataset(
             {
                 'features':
                     self._get_roll_nonmissing(
-                        x=ds[features],
+                        x=f,
                         mode='all' if f_require_all else 'any',
                         roll_dim=seq_dim,
                         roll_size=f_window_size
                     ),
                 'targets':
                     self._get_roll_nonmissing(
-                        x=ds[targets],
+                        x=t,
                         mode='all' if t_require_all else 'any',
                         roll_dim=seq_dim,
                         roll_size=t_window_size
