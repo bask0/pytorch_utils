@@ -208,7 +208,7 @@ class SeqScheme(object):
         t_full_seq = False
         if (f_window_size == -1) ^ (t_window_size == -1):
             raise ValueError(
-                'set neither or both of `f_window_size=` and `t_window_size` to -1.'
+                'set neither or both of `f_window_size` and `t_window_size` to -1.'
             )
         if f_window_size == -1:
             f_window_size = seq_len
@@ -264,8 +264,8 @@ class SeqScheme(object):
             t = ds[targets].notnull()
 
         if f_full_seq:
-            f_mask = xr.ones_like(ds[features[0]])
-            f_mask.values[-1] = 1
+            f_mask = xr.zeros_like(ds[features[0]], dtype='bool')
+            f_mask[{seq_dim: -1}] = True
         else:
             f_mask = self._get_roll_nonmissing(
                 x=f,
@@ -276,8 +276,8 @@ class SeqScheme(object):
             ).compute()
 
         if t_full_seq:
-            t_mask = xr.ones_like(ds[features[0]])
-            t_mask.values[-1] = 1
+            t_mask = xr.zeros_like(ds[features[0]], dtype='bool')
+            t_mask[{seq_dim: -1}] = True
         else:
             t_mask = self._get_roll_nonmissing(
                 x=t,
@@ -294,10 +294,10 @@ class SeqScheme(object):
         self.t_mask = t_mask
         self.mask = mask.compute()
         self.coords = np.argwhere(self.mask.values)
-        if len(self.coords) == 0:
-            raise RuntimeError(
-                'the length of the coordinates is 0, no samples can be generated.'
-            )
+        # if len(self.coords) == 0:
+        #     raise RuntimeError(
+        #         'the length of the coordinates is 0, no samples can be generated.'
+        #     )
         self.perc_masked = 100 - int(self.mask.sum() / np.product(self.mask.shape) * 100)
 
     def _get_roll_nonmissing(
