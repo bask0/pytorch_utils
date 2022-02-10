@@ -143,16 +143,12 @@ class SeqScheme(object):
         is done, positive values indicate that the prediction is done n steps into the future. Negative values
         indicate that past values are predicted.
         See `Prediction scheme` for more information.
-    f_allow_miss : bool
-        Whether missing features are allowed within the moving window. If `True`, features are not checked.
-        Default is `False`.
-    t_allow_miss : bool
-        Whether missing targets are allowed within the moving window. If `True`, targets are not checked.
-        Default is `False`.
-    t_fraction_required: float (0.0, 1.0]
-        The fraction of values that must be present in `t_window_size`. E.g., with 0.5, 50 % of the values must be
-        present in the widow. Default is 1.0, meaning that all values must be present. Must not be passed
-        if `t_allow_miss = False`.
+    f_frac: float [0.0, 1.0]
+        The fraction of values that must be present in `f_window_size`. E.g., with 0.5, 50 % of the values must be
+        present in the widow. Default is 1.0, meaning that all values must be present, 0.0 means that no values are
+        required.
+    t_frac: float [0.0, 1.0]
+        Same as `f_frac`, but for the target. Default is 1.0.
     f_require_all : bool
         If `True` (default), the features are masked if ANY feature is missing and else if ALL features are missing.
         In other words, if you want *at least one* feature to be present, set `False`, if you want *all* features to
@@ -178,9 +174,8 @@ class SeqScheme(object):
             f_window_size: Union[int, str] = 1,
             t_window_size: Union[int, str] = 1,
             predict_shift: int = 0,
-            f_allow_miss: bool = False,
-            t_allow_miss: bool = False,
-            t_fraction_required: float = 1.0,
+            f_frac: float = 1.0,
+            t_frac: float = 1.0,
             f_require_all: bool = True,
             t_require_all: bool = True,
             f_is_qc: bool = True,
@@ -190,9 +185,8 @@ class SeqScheme(object):
         self.features = [features] if isinstance(features, str) else features
         self.targets = [targets] if isinstance(targets, str) else targets
         self.predict_shift = predict_shift
-        self.f_allow_miss = f_allow_miss
-        self.t_allow_miss = t_allow_miss
-        self.t_fraction_required = t_fraction_required
+        self.f_frac = f_frac
+        self.t_frac = t_frac
         self.f_require_all = f_require_all
         self.t_require_all = t_require_all
         self.f_is_qc = f_is_qc
@@ -235,12 +229,6 @@ class SeqScheme(object):
         if isinstance(t_window_size, str):
             _, t_window_size = self._handle_freq(freq=t_window_size)
 
-        if (not t_allow_miss) and (t_fraction_required < 1.0):
-            raise ValueError(
-                '`t_allow_miss=False` implies that no values can be missing in the target window, but you also '
-                f'passed a value of `t_fraction_required={t_fraction_required}`. This is not allowed.'
-            )
-
         self.f_window_size = f_window_size
         self.t_window_size = t_window_size
 
@@ -254,27 +242,30 @@ class SeqScheme(object):
         else:
             t = ds[targets].notnull()
 
-        if f_allow_miss:
-            f_mask = xr.ones_like(ds[features[0]])
+        if f_frac == 0.0:
+            f_mask = xr.ones_like(ds[features[0]], dtype='bool')
         else:
             f_mask = self._get_roll_nonmissing(
                 x=f,
                 mode='all' if f_require_all else 'any',
                 roll_dim=seq_dim,
-                roll_size=f_window_size
+                roll_size=f_window_size,
+                min_required=f_frac
             ).compute()
 
-        if t_allow_miss:
-            t_mask = xr.ones_like(ds[features[0]])
+        if t_frac == 0.0:
+            t_mask = xr.ones_like(ds[features[0]], dtype='bool')
         else:
             t_mask = self._get_roll_nonmissing(
                 x=t,
                 mode='all' if t_require_all else 'any',
                 roll_dim=seq_dim,
                 roll_size=t_window_size,
-                min_required=t_fraction_required
+                min_required=t_frac
             ).shift(time=-predict_shift, fill_value=False).compute()
 
+        print(f_mask)
+        print(t_mask)
         mask = f_mask & t_mask
         self.dims = mask.dims
 
@@ -294,7 +285,7 @@ class SeqScheme(object):
             mode: str,
             roll_dim: str,
             roll_size: int,
-            min_required: float = 1.0) -> xr.DataArray:
+            min_required: float) -> xr.DataArray:
         """Generate a mask of missing values in a moving window.
 
         Parameters
@@ -309,7 +300,7 @@ class SeqScheme(object):
             The moving window size.
         min_required : float
             The minimum fraction of values that must be present in the window, a float in the range (0.0, 1,0].
-            Default is 1.0, which means that all values mus be present. With 0.5, for example, 50 % of the values must
+            A value of 1.0 means that all values mus be present. With 0.5, for example, 50 % of the values must
             be present in the window.
 
         Returns
@@ -325,14 +316,16 @@ class SeqScheme(object):
                 f'arg `mode` must be one of `all` | `any`, is `{mode}`.'
             )
 
-        if 0.0 <= min_required > 1.0:
+        if 0.0 > min_required > 1.0:
             raise ValueError(
-                'argument `min_required` must be in the range (0.0, 1.0].'
+                'argument `min_required` must be in the range [0.0, 1.0].'
             )
 
         min_required = roll_size * min_required
 
-        return fn(x.to_array('variable')).astype(int).rolling({roll_dim: roll_size}).sum() >= min_required
+        r = fn(x.to_array('variable')).astype(int).rolling({roll_dim: roll_size}).sum() >= min_required
+
+        return r
 
     def _handle_freq(
             self,
@@ -515,12 +508,12 @@ class SeqScheme(object):
         """
         random_state = np.random.RandomState(seed=seed)
 
-        def new_var(num_var=3, num_sites=4, num_nan=4):
+        def new_var(num_var=3, num_sites=4, num_nan=2):
             ds = xr.Dataset()
             for i in range(num_var):
                 v_list = []
                 for _ in range(num_sites):
-                    v = np.arange(48.)
+                    v = np.ones(48)
                     s = random_state.choice(len(v), num_nan)
                     v[s] = np.nan
                     v_list.append(v)
