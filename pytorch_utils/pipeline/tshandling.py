@@ -206,7 +206,7 @@ class SeqScheme(object):
         seq_len = len(ds[seq_dim])
         f_full_seq = False
         t_full_seq = False
-        if (f_window_size == -1) ^ (t_window_size == -1):
+        if not ((f_window_size == -1) ^ (t_window_size == -1)):
             raise ValueError(
                 'set neither or both of `f_window_size=` and `t_window_size` to -1.'
             )
