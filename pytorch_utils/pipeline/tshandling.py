@@ -242,41 +242,31 @@ class SeqScheme(object):
         else:
             t = ds[targets].notnull()
 
-        window_valid = xr.Dataset(
-            {
-                'features':
-                    self._get_roll_nonmissing(
-                        x=f,
-                        mode='all' if f_require_all else 'any',
-                        roll_dim=seq_dim,
-                        roll_size=f_window_size
-                    ).compute(),
-                'targets':
-                    self._get_roll_nonmissing(
-                        x=t,
-                        mode='all' if t_require_all else 'any',
-                        roll_dim=seq_dim,
-                        roll_size=t_window_size
-                    ).shift(time=-predict_shift, fill_value=False).compute()
-            }
-        )
-
-        self.dims = window_valid.features.dims
-
-        mask: xr.DataArray
         if f_allow_miss:
-            if t_allow_miss:
-                mask = xr.ones_like(window_valid.features)
-            else:
-                mask = window_valid.targets
+            f_mask = xr.ones_like(ds[features[0]])
         else:
-            if t_allow_miss:
-                mask = window_valid.features
-            else:
-                mask = window_valid.features & window_valid.targets
+            f_mask = self._get_roll_nonmissing(
+                x=f,
+                mode='all' if f_require_all else 'any',
+                roll_dim=seq_dim,
+                roll_size=f_window_size
+            ).compute(),
 
-        self.f_mask = window_valid.features
-        self.t_mask = window_valid.targets
+        if t_allow_miss:
+            t_mask = xr.ones_like(ds[features[0]])
+        else:
+            t_mask = self._get_roll_nonmissing(
+                x=t,
+                mode='all' if t_require_all else 'any',
+                roll_dim=seq_dim,
+                roll_size=t_window_size
+            ).shift(time=-predict_shift, fill_value=False).compute()
+
+        mask = f_mask & t_mask
+        self.dims = mask.dims
+
+        self.f_mask = f_mask
+        self.t_mask = t_mask
         self.mask = mask.compute()
         self.coords = np.argwhere(self.mask.values)
         if len(self.coords) == 0:
