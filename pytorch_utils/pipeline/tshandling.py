@@ -194,7 +194,6 @@ class SeqScheme(object):
         self.t_require_all = t_require_all
         self.f_is_qc = f_is_qc
         self.t_is_qc = t_is_qc
-        self.inference_mode = inference_mode
         self.seq_dim = seq_dim
         self.seq_data = ds[self.seq_dim]
 
