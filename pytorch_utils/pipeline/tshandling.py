@@ -325,7 +325,7 @@ class SeqScheme(object):
                 f'arg `mode` must be one of `all` | `any`, is `{mode}`.'
             )
 
-        if 0.0 < min_required <= 1.0:
+        if 0.0 <= min_required > 1.0:
             raise ValueError(
                 'argument `min_required` must be in the range (0.0, 1.0].'
             )
