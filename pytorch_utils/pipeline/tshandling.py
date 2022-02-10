@@ -133,11 +133,14 @@ class SeqScheme(object):
         axis. The argument is used to find instances of the frequencies that satisfy the conditions given by
         `f_allow_miss` and `f_require_all`, i.e., if `f_allow_miss==True`, only some values must be present in each
         frequency unit, etc. Note that only 'Y' (year), 'M' (month), 'W' (week), 'D' (day), and `H` (hour) are
-        supported currently. See `Prediction scheme` for more information.
+        supported currently. See `Prediction scheme` for more information. If -1 is passed, the window size will be
+        inferred from the sequence length, i.e., the window has the length of the sequence.
     t_window_size : Union[int >= 1, str]
         The target window size along the `seq_dim` (e.g., `time`), i.e., how many steps in a given dimension the
         targets must be present. The default (1) is the most common case, where 1 value is predicted.
-        See `t_window_size` for supported frequencies and `Prediction scheme` for more information.
+        See `t_window_size` for supported frequencies and `Prediction scheme` for more information. If -1 is passed,
+        the window size will be
+        inferred from the sequence length, i.e., the window has the length of the sequence.
     predict_shift : int >= 0
         An integer indicating the shift of the target compared to the features. The default, 0, means that no shift
         is done, positive values indicate that the prediction is done n steps into the future.
@@ -163,10 +166,6 @@ class SeqScheme(object):
         interpreted as `valid`, which excludes NaN and inf.
     t_is_qc: bool
         Same as `f_is_qc` with `True` as default, but for targets.
-    inference_mode: Optional[str]
-        Setting to `False` (default) has no impact. Otherwise, can be:
-            `t_range`: 
-            `full`: 
     seq_dim : str
         The sequence dimension, default is `time`. Must be present in `ds`.
     """
@@ -184,7 +183,6 @@ class SeqScheme(object):
             t_require_all: bool = True,
             f_is_qc: bool = True,
             t_is_qc: bool = True,
-            inference_mode: Optional[str] = None,
             seq_dim: str = 'time') -> None:
 
         self.features = [features] if isinstance(features, str) else features
@@ -208,11 +206,13 @@ class SeqScheme(object):
         seq_len = len(ds[seq_dim])
         for k, v in [['f_window_size', f_window_size], ['t_window_size', t_window_size]]:
             if not isinstance(v, str):
-                if v < 1:
+                if v == -1:
+                    v = seq_len
+                elif v < 1:
                     raise ValueError(
                         f'argument `{k}` cannot be < 1, is {v}.'
                     )
-                if v > seq_len:
+                elif v > seq_len:
                     raise ValueError(
                         f'argument `{k}` cannot be > seq_len={seq_len}, is {v}.'
                     )
