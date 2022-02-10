@@ -250,7 +250,7 @@ class SeqScheme(object):
                 mode='all' if f_require_all else 'any',
                 roll_dim=seq_dim,
                 roll_size=f_window_size
-            ).compute(),
+            ).compute()
 
         if t_allow_miss:
             t_mask = xr.ones_like(ds[features[0]])
@@ -261,6 +261,9 @@ class SeqScheme(object):
                 roll_dim=seq_dim,
                 roll_size=t_window_size
             ).shift(time=-predict_shift, fill_value=False).compute()
+
+        print(f_mask)
+        print(t_mask)
 
         mask = f_mask & t_mask
         self.dims = mask.dims
