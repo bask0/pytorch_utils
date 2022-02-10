@@ -264,8 +264,6 @@ class SeqScheme(object):
                 min_required=t_frac
             ).shift(time=-predict_shift, fill_value=False).compute()
 
-        print(f_mask)
-        print(t_mask)
         mask = f_mask & t_mask
         self.dims = mask.dims
 
