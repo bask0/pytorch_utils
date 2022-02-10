@@ -203,11 +203,13 @@ class SeqScheme(object):
             )
 
         seq_len = len(ds[seq_dim])
+        if f_window_size == -1:
+            f_window_size = seq_len
+        if t_window_size == -1:
+            t_window_size = seq_len
         for k, v in [['f_window_size', f_window_size], ['t_window_size', t_window_size]]:
             if not isinstance(v, str):
-                if v == -1:
-                    v = seq_len
-                elif v < 1:
+                if v < 1:
                     raise ValueError(
                         f'argument `{k}` cannot be < 1, is {v}.'
                     )
