@@ -250,14 +250,14 @@ class SeqScheme(object):
                         mode='all' if f_require_all else 'any',
                         roll_dim=seq_dim,
                         roll_size=f_window_size
-                    ),
+                    ).compute(),
                 'targets':
                     self._get_roll_nonmissing(
                         x=t,
                         mode='all' if t_require_all else 'any',
                         roll_dim=seq_dim,
                         roll_size=t_window_size
-                    ).shift(time=-predict_shift, fill_value=False)
+                    ).shift(time=-predict_shift, fill_value=False).compute()
             }
         )
 
@@ -275,8 +275,8 @@ class SeqScheme(object):
             else:
                 mask = window_valid.features & window_valid.targets
 
-        self.f_mask = window_valid.features.compute()
-        self.t_mask = window_valid.targets.compute()
+        self.f_mask = window_valid.features
+        self.t_mask = window_valid.targets
         self.mask = mask.compute()
         self.coords = np.argwhere(self.mask.values)
         if len(self.coords) == 0:
