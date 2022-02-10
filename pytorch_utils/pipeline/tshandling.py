@@ -143,11 +143,12 @@ class SeqScheme(object):
         is done, positive values indicate that the prediction is done n steps into the future. Negative values
         indicate that past values are predicted.
         See `Prediction scheme` for more information.
-    f_frac: float [0.0, 1.0]
-        The fraction of values that must be present in `f_window_size`. E.g., with 0.5, 50 % of the values must be
-        present in the widow. Default is 1.0, meaning that all values must be present, 0.0 means that no values are
-        required.
-    t_frac: float [0.0, 1.0]
+    f_frac: float [0.0, 1.0] or int [0, t_window_size]
+        The fraction (if float) or amount (if int) of values that must be present in `f_window_size`. E.g., with 0.5,
+        50 % of the values must be present in the window. Default is 1.0, meaning that all values must be present, 0.0
+        means that no values are required. For integers, the value is interpreted as absolute number of values that
+        are required.
+    t_frac: float [0.0, 1.0] or int [0, t_window_size]
         Same as `f_frac`, but for the target. Default is 1.0.
     f_require_all : bool
         If `True` (default), the features are masked if ANY feature is missing and else if ALL features are missing.
@@ -174,8 +175,8 @@ class SeqScheme(object):
             f_window_size: Union[int, str] = 1,
             t_window_size: Union[int, str] = 1,
             predict_shift: int = 0,
-            f_frac: float = 1.0,
-            t_frac: float = 1.0,
+            f_frac: Union[float, int] = 1.0,
+            t_frac: Union[float, int] = 1.0,
             f_require_all: bool = True,
             t_require_all: bool = True,
             f_is_qc: bool = True,
@@ -283,7 +284,7 @@ class SeqScheme(object):
             mode: str,
             roll_dim: str,
             roll_size: int,
-            min_required: float) -> xr.DataArray:
+            min_required: Union[float, int]) -> xr.DataArray:
         """Generate a mask of missing values in a moving window.
 
         Parameters
@@ -296,10 +297,10 @@ class SeqScheme(object):
             The dimension to apply moving window on.
         roll_size : int
             The moving window size.
-        min_required : float
-            The minimum fraction of values that must be present in the window, a float in the range (0.0, 1,0].
-            A value of 1.0 means that all values mus be present. With 0.5, for example, 50 % of the values must
-            be present in the window.
+        min_required : float [0.0, 1.0] or int [0, t_window_size]
+            The minimum fraction (if float) or amount (if int) of values that must be present in the window, a float
+            in the range [0.0, 1,0] or an integer in the range [0, roll_size]. A value of 1.0 means that all values
+            must be present. With 0.5, for example, 50 % of the values must be present in the window.
 
         Returns
         -------
@@ -314,12 +315,17 @@ class SeqScheme(object):
                 f'arg `mode` must be one of `all` | `any`, is `{mode}`.'
             )
 
-        if 0.0 > min_required > 1.0:
-            raise ValueError(
-                'argument `min_required` must be in the range [0.0, 1.0].'
-            )
-
-        min_required = roll_size * min_required
+        if isinstance(min_required, int):
+            if 0 > min_required > roll_size:
+                raise ValueError(
+                    f'the argument `min_required={min_required}` must be in range [0, roll_size={roll_size}].'
+                )
+        else:
+            if 0.0 > min_required > 1.0:
+                raise ValueError(
+                    'argument `min_required` must be in the range [0.0, 1.0].'
+                )
+            min_required = roll_size * min_required
 
         r = fn(x.to_array('variable')).astype(int).rolling({roll_dim: roll_size}).sum() >= min_required
 
