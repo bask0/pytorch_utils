@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from typing import List, Union, Tuple, Dict, Any
+from typing import List, Union, Tuple, Dict, Any, Optional
 import inspect
 import re
 
@@ -138,10 +138,9 @@ class SeqScheme(object):
         The target window size along the `seq_dim` (e.g., `time`), i.e., how many steps in a given dimension the
         targets must be present. The default (1) is the most common case, where 1 value is predicted.
         See `t_window_size` for supported frequencies and `Prediction scheme` for more information.
-    predict_shift : int
+    predict_shift : int >= 0
         An integer indicating the shift of the target compared to the features. The default, 0, means that no shift
-        is done, positive values indicate that the prediction is done n steps into the future. Negative values
-        indicate that past values are predicted.
+        is done, positive values indicate that the prediction is done n steps into the future.
         See `Prediction scheme` for more information.
     f_frac: float [0.0, 1.0] or int [0, t_window_size]
         The fraction (if float) or amount (if int) of values that must be present in `f_window_size`. E.g., with 0.5,
@@ -164,6 +163,10 @@ class SeqScheme(object):
         interpreted as `valid`, which excludes NaN and inf.
     t_is_qc: bool
         Same as `f_is_qc` with `True` as default, but for targets.
+    inference_mode: Optional[str]
+        Setting to `False` (default) has no impact. Otherwise, can be:
+            `t_range`: 
+            `full`: 
     seq_dim : str
         The sequence dimension, default is `time`. Must be present in `ds`.
     """
@@ -181,6 +184,7 @@ class SeqScheme(object):
             t_require_all: bool = True,
             f_is_qc: bool = True,
             t_is_qc: bool = True,
+            inference_mode: Optional[str] = None,
             seq_dim: str = 'time') -> None:
 
         self.features = [features] if isinstance(features, str) else features
@@ -192,6 +196,7 @@ class SeqScheme(object):
         self.t_require_all = t_require_all
         self.f_is_qc = f_is_qc
         self.t_is_qc = t_is_qc
+        self.inference_mode = inference_mode
         self.seq_dim = seq_dim
         self.seq_data = ds[self.seq_dim]
 
@@ -225,6 +230,11 @@ class SeqScheme(object):
                 f'The time frequency must either be daily (`D`) of hourly (`H`), is `{self.time_freq}`.'
             )
 
+        if predict_shift < 0:
+            raise ValueError(
+                f'`predict_shift` cannot be negative, is `{predict_shift}`.'
+            )
+
         if isinstance(f_window_size, str):
             f_window_size, _ = self._handle_freq(freq=f_window_size)
         if isinstance(t_window_size, str):
@@ -243,27 +253,21 @@ class SeqScheme(object):
         else:
             t = ds[targets].notnull()
 
-        if f_frac == 0.0:
-            f_mask = xr.ones_like(ds[features[0]], dtype='bool')
-        else:
-            f_mask = self._get_roll_nonmissing(
-                x=f,
-                mode='all' if f_require_all else 'any',
-                roll_dim=seq_dim,
-                roll_size=f_window_size,
-                min_required=f_frac
-            ).compute()
+        f_mask = self._get_roll_nonmissing(
+            x=f,
+            mode='all' if f_require_all else 'any',
+            roll_dim=seq_dim,
+            roll_size=f_window_size,
+            min_required=f_frac
+        ).compute()
 
-        if t_frac == 0.0:
-            t_mask = xr.ones_like(ds[features[0]], dtype='bool')
-        else:
-            t_mask = self._get_roll_nonmissing(
-                x=t,
-                mode='all' if t_require_all else 'any',
-                roll_dim=seq_dim,
-                roll_size=t_window_size,
-                min_required=t_frac
-            ).shift(time=-predict_shift, fill_value=False).compute()
+        t_mask = self._get_roll_nonmissing(
+            x=t,
+            mode='all' if t_require_all else 'any',
+            roll_dim=seq_dim,
+            roll_size=t_window_size,
+            min_required=t_frac
+        ).shift(time=-predict_shift, fill_value=False).compute()
 
         mask = f_mask & t_mask
         self.dims = mask.dims
