@@ -275,9 +275,9 @@ class SeqScheme(object):
             else:
                 mask = window_valid.features & window_valid.targets
 
-        self.f_mask = window_valid.features
-        self.t_mask = window_valid.targets
-        self.mask = mask
+        self.f_mask = window_valid.features.compute()
+        self.t_mask = window_valid.targets.compute()
+        self.mask = mask.compute()
         self.coords = np.argwhere(self.mask.values)
         if len(self.coords) == 0:
             raise RuntimeError(
